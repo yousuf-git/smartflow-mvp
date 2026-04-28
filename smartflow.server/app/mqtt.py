@@ -7,21 +7,23 @@ from typing import Optional
 import aiomqtt
 
 from app.config import Settings
-from app.sessions import registry
+from app.db import get_sessionmaker
+from app import purchase_service
+from app.runtime import registry
 
 logger = logging.getLogger(__name__)
 
 
-def cmd_topic(device_id: str) -> str:
-    return f"smartflow/cmd/{device_id}"
+def cmd_topic(controller_name: str) -> str:
+    return f"smartflow/cmd/{controller_name}"
 
 
-def ack_topic(device_id: str) -> str:
-    return f"smartflow/ack/{device_id}"
+def ack_topic(controller_name: str) -> str:
+    return f"smartflow/ack/{controller_name}"
 
 
-def progress_topic(device_id: str) -> str:
-    return f"smartflow/progress/{device_id}"
+def progress_topic(controller_name: str) -> str:
+    return f"smartflow/progress/{controller_name}"
 
 
 class MQTTClient:
@@ -78,13 +80,13 @@ class MQTTClient:
                 ) as client:
                     self._client = client
                     backoff = 1.0
-                    await client.subscribe(ack_topic(s.DEVICE_ID), qos=1)
-                    await client.subscribe(progress_topic(s.DEVICE_ID), qos=1)
+                    await client.subscribe(ack_topic(s.CONTROLLER_NAME), qos=1)
+                    await client.subscribe(progress_topic(s.CONTROLLER_NAME), qos=1)
                     self._ready.set()
                     logger.info(
-                        "mqtt.connected endpoint=%s device=%s",
+                        "mqtt.connected endpoint=%s controller=%s",
                         s.AWS_IOT_ENDPOINT,
-                        s.DEVICE_ID,
+                        s.CONTROLLER_NAME,
                     )
                     async for message in client.messages:
                         await self._dispatch(str(message.topic), message.payload)
@@ -106,44 +108,89 @@ class MQTTClient:
             logger.error("mqtt.payload.malformed topic=%s err=%s raw=%r", topic, exc, raw)
             return
 
-        session_id = payload.get("id")
-        if not session_id:
+        raw_id = payload.get("id")
+        if raw_id is None:
             logger.warning("mqtt.payload.no-id topic=%s payload=%s", topic, payload)
             return
+        try:
+            cane_id = int(raw_id)
+        except (TypeError, ValueError):
+            logger.warning("mqtt.payload.bad-id topic=%s id=%s", topic, raw_id)
+            return
 
-        device_id = self._settings.DEVICE_ID
-        if topic == ack_topic(device_id):
-            await registry.resolve_ack(session_id, payload)
-        elif topic == progress_topic(device_id):
-            payload = await self._check_overage(device_id, session_id, payload)
-            await registry.push_progress(session_id, payload)
+        controller = self._settings.CONTROLLER_NAME
+        if topic == ack_topic(controller):
+            await registry.resolve_ack(cane_id, payload)
+        elif topic == progress_topic(controller):
+            await self._handle_progress(cane_id, payload)
         else:
             logger.debug("mqtt.topic.unhandled topic=%s", topic)
 
-    async def _check_overage(self, device_id: str, session_id: str, payload: dict) -> dict:
-        session = registry.get(session_id)
-        if session is None or session.terminal:
-            return payload
-        received = float(payload.get("litres", 0))
-        if received <= session.litres:
-            return payload
-        logger.info(
-            "mqtt.overage id=%s received=%.2f target=%.2f — publishing STOP, treating as complete",
-            session_id,
-            received,
-            session.litres,
-        )
-        published = await self.publish(
-            cmd_topic(device_id),
-            {"id": session_id, "action": "STOP"},
-        )
-        if not published:
-            logger.error("mqtt.stop.publish-failed id=%s", session_id)
-        return {
-            **payload,
-            "litres": session.litres,
-            "status": "complete",
-        }
+    async def _handle_progress(self, cane_id: int, payload: dict) -> None:
+        from decimal import Decimal
+
+        from app.models import Purchase, PurchaseStatus
+
+        status = payload.get("status")
+        if status not in ("dispensing", "complete", "failed"):
+            logger.warning("mqtt.progress.bad-status cane=%s payload=%s", cane_id, payload)
+            return
+
+        litres = Decimal(str(payload.get("litres", 0)))
+        reason = payload.get("reason")
+
+        sm = get_sessionmaker()
+        async with sm() as session:
+            # Peek at target + status BEFORE applying so we can decide whether
+            # to send a STOP to the controller for an overshoot.
+            preview = await session.get(Purchase, cane_id)
+            should_stop_device = (
+                status == "dispensing"
+                and preview is not None
+                and preview.status == PurchaseStatus.started
+                and preview.litres_count > 0
+                and litres >= preview.litres_count
+            )
+            tap_id_for_stop = preview.tap_id if preview is not None else None
+
+            cane = await purchase_service.apply_progress(
+                session, cane_id, litres=litres, status=status, reason=reason
+            )
+            await session.commit()
+
+            if should_stop_device and tap_id_for_stop is not None:
+                logger.info(
+                    "mqtt.progress.overflow cane=%s litres=%s target=%s → STOP",
+                    cane_id,
+                    litres,
+                    preview.litres_count,
+                )
+                await self.publish(
+                    cmd_topic(self._settings.CONTROLLER_NAME),
+                    {"id": cane_id, "tap_id": tap_id_for_stop, "action": "STOP"},
+                )
+
+            if cane is None:
+                return
+            frame = {
+                "cane_id": cane.id,
+                "tap_id": cane.tap_id,
+                "litres": float(cane.litres_delivered),
+                "status": cane.status.value,
+                "reason": cane.reason,
+            }
+            await registry.push_progress(cane_id, frame)
+
+            # If this cane was terminal and the whole group is done, cancel the
+            # idle timer so it doesn't later kick the WS. The socket stays open
+            # until the client closes it (there may still be canes the user
+            # wants to inspect).
+            if cane.status in purchase_service.TERMINAL_STATUSES:
+                group = await purchase_service.load_group(session, cane.group_id)
+                if group is not None and all(
+                    p.status in purchase_service.TERMINAL_STATUSES for p in group.purchases
+                ):
+                    registry.cancel_idle(cane.group_id)
 
 
 _mqtt_client: Optional[MQTTClient] = None

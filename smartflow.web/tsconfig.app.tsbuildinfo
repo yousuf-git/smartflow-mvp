@@ -1,1 +1,1 @@
-{"root":["./src/App.tsx","./src/main.tsx","./src/theme.ts","./src/vite-env.d.ts","./src/components/DispenseForm.tsx","./src/components/DispenseProgress.tsx","./src/lib/api.ts","./src/lib/ws.ts"],"version":"6.0.3"}
+{"root":["./src/App.tsx","./src/main.tsx","./src/theme.ts","./src/vite-env.d.ts","./src/components/CaneBuilder.tsx","./src/components/CaneCard.tsx","./src/components/ProgressScreen.tsx","./src/components/WalletHeader.tsx","./src/lib/api.ts","./src/lib/ws.ts"],"version":"6.0.3"}

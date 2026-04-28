@@ -5,8 +5,10 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import get_settings
+from app.db import dispose_engine, init_engine
 from app.mqtt import init_mqtt_client
 from app.routes import router
+from app.seed import init_schema_and_seed  # package re-export
 
 
 def _configure_logging(level: str) -> None:
@@ -20,15 +22,18 @@ def _configure_logging(level: str) -> None:
 async def lifespan(app: FastAPI):
     settings = get_settings()
     _configure_logging(settings.LOG_LEVEL)
+    init_engine(settings)
+    await init_schema_and_seed(settings)
     mqtt = init_mqtt_client(settings)
     await mqtt.start()
     try:
         yield
     finally:
         await mqtt.stop()
+        await dispose_engine()
 
 
-app = FastAPI(title="SmartFlow MVP Server", version="1.0.0", lifespan=lifespan)
+app = FastAPI(title="SmartFlow MVP Server", version="1.1.0", lifespan=lifespan)
 
 _settings = get_settings()
 app.add_middleware(
@@ -44,4 +49,4 @@ app.include_router(router)
 
 @app.get("/")
 async def root():
-    return {"service": "smartflow-mvp-server", "version": "1.0.0"}
+    return {"service": "smartflow-mvp-server", "version": "1.1.0"}
