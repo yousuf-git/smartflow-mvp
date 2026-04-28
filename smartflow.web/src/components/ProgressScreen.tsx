@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Button, Chip, Paper, Typography } from "@mui/material";
-import ArrowBackRoundedIcon from "@mui/icons-material/ArrowBackRounded";
+import QrCodeScannerIcon from "@mui/icons-material/QrCodeScanner";
 import CaneCard from "./CaneCard";
 import type { Cane, Order, Plant } from "../lib/api";
 
@@ -53,44 +53,67 @@ export default function ProgressScreen({
         sx={{ border: "1px solid #EDF0F2", borderRadius: 3 }}
         className="p-5 sm:p-6"
       >
-        <div className="flex items-center justify-between gap-4 flex-wrap">
+        <div className="flex items-start justify-between gap-4 flex-wrap">
           <div>
             <Typography
               variant="overline"
-              className="tracking-widest"
-              sx={{ color: "text.secondary" }}
+              sx={{ color: "text.secondary", letterSpacing: 2 }}
             >
               {plant.name}
             </Typography>
-            <Typography variant="h6" sx={{ fontWeight: 600 }}>
-              Dispensing
+            <Typography variant="h6" sx={{ fontWeight: 700, lineHeight: 1.2 }}>
+              {allTerminal ? "Session complete" : "In progress"}
             </Typography>
-            <Typography variant="body2" sx={{ color: "text.secondary", mt: 0.5 }}>
-              {order.canes.length} canes · {order.total_litres.toFixed(1)} L · total{" "}
-              {order.total_price.toFixed(2)}
-            </Typography>
+
+            {/* Session summary chips */}
+            <div className="flex flex-wrap gap-2 mt-2">
+              <Chip
+                label={`${order.canes.length} ${order.canes.length === 1 ? "cane" : "canes"}`}
+                size="small"
+                sx={{ bgcolor: "#F6F8F9", color: "text.secondary", fontWeight: 600 }}
+              />
+              <Chip
+                label={`${order.total_litres.toFixed(1)} L`}
+                size="small"
+                sx={{ bgcolor: "#E8F6FB", color: "#074E66", fontWeight: 600 }}
+              />
+              <Chip
+                label={`PKR ${order.total_price.toFixed(2)}`}
+                size="small"
+                sx={{ bgcolor: "#F6F8F9", color: "text.secondary", fontWeight: 600 }}
+              />
+            </div>
           </div>
-          <div className="flex items-center gap-2">
+
+          <div className="flex flex-col items-end gap-2">
             {hasPending && <IdleTimer deadline={idleDeadline} />}
+
             {allTerminal ? (
               <Button
                 variant="contained"
-                startIcon={<ArrowBackRoundedIcon />}
+                startIcon={<QrCodeScannerIcon />}
                 onClick={onDone}
                 sx={{ textTransform: "none", fontWeight: 600 }}
               >
-                Done · back home
+                New session
               </Button>
             ) : (
-              <Button
-                variant="outlined"
-                color="error"
-                onClick={onCancel}
-                disabled={!hasPending}
-                sx={{ textTransform: "none", fontWeight: 600 }}
-              >
-                Cancel remaining
-              </Button>
+              <>
+                <Button
+                  variant="outlined"
+                  color="error"
+                  onClick={onCancel}
+                  disabled={!hasPending}
+                  sx={{ textTransform: "none", fontWeight: 600 }}
+                >
+                  Cancel pending canes
+                </Button>
+                {!hasPending && (
+                  <Typography variant="caption" sx={{ color: "text.secondary", textAlign: "right" }}>
+                    Stop or complete all active fills to end
+                  </Typography>
+                )}
+              </>
             )}
           </div>
         </div>
@@ -98,8 +121,7 @@ export default function ProgressScreen({
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
         {order.canes.map((cane) => {
-          const tapBusy =
-            !!activeByTap[cane.tap_id] && cane.status === "pending";
+          const tapBusy = !!activeByTap[cane.tap_id] && cane.status === "pending";
           return (
             <CaneCard
               key={cane.id}
@@ -129,13 +151,11 @@ function IdleTimer({ deadline }: { deadline: number | null }) {
   }, [deadline]);
   if (deadline === null) return null;
   const secs = Math.max(0, Math.round((deadline - now) / 1000));
-  const mm = Math.floor(secs / 60)
-    .toString()
-    .padStart(2, "0");
+  const mm = Math.floor(secs / 60).toString().padStart(2, "0");
   const ss = (secs % 60).toString().padStart(2, "0");
   return (
     <Chip
-      label={`Auto-release in ${mm}:${ss}`}
+      label={`Pending canes release in ${mm}:${ss}`}
       size="small"
       sx={{ bgcolor: "#EEFAFD", color: "#074E66", fontWeight: 600 }}
     />

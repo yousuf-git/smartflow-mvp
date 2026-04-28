@@ -118,7 +118,7 @@ export default function CaneCard({
             0.0
           </span>
           <Typography variant="body2" sx={{ color: "text.secondary" }}>
-            / {cane.litres_requested.toFixed(1)} L · PKR {cane.price.toFixed(2)}
+            of {cane.litres_requested.toFixed(1)} L · PKR {cane.price.toFixed(2)}
           </Typography>
         </div>
 
@@ -162,15 +162,15 @@ export default function CaneCard({
             cane.status === "failed" ||
             cane.status === "cancelled") && (
             <Typography variant="body2" sx={{ color: "text.secondary" }}>
-              {cane.status === "completed" && "Done."}
-              {cane.status === "partial_completed" && "Stopped — partial fill kept."}
-              {cane.status === "failed" && "Failed — unused litres refunded."}
-              {cane.status === "cancelled" && "Cancelled — hold released."}
+              {cane.status === "completed" && "Filled successfully."}
+              {cane.status === "partial_completed" && "Stopped early — partial amount kept."}
+              {cane.status === "failed" && "Failed — unused credit returned."}
+              {cane.status === "cancelled" && "Cancelled — credit returned."}
             </Typography>
           )}
           {cane.status === "pending" && cane.retry_count > 0 && (
             <Typography variant="caption" sx={{ color: "text.secondary" }}>
-              attempt {cane.retry_count}
+              Attempt {cane.retry_count + 1}
             </Typography>
           )}
         </div>

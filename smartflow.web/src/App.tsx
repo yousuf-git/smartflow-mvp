@@ -1,8 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Alert, CircularProgress, Snackbar, Typography } from "@mui/material";
+import { CircularProgress } from "@mui/material";
 import WalletHeader from "./components/WalletHeader";
 import CaneBuilder, { type DraftCane } from "./components/CaneBuilder";
 import ProgressScreen from "./components/ProgressScreen";
+import QRScanScreen from "./components/QRScanScreen";
+import Toast from "./components/Toast";
+import { useToast } from "./lib/useToast";
 import {
   cancelOrder,
   createOrder,
@@ -16,36 +19,27 @@ import {
   type Me,
   type Order,
   type Plant,
+  type Tap,
 } from "./lib/api";
 import { openOrderSocket, type OrderFrame } from "./lib/ws";
 
 type Screen =
   | { kind: "loading" }
+  | { kind: "qr_scan" }
   | { kind: "home" }
   | { kind: "submitting" }
-  | {
-      kind: "progress";
-      order: Order;
-      startingCaneId: number | null;
-    };
-
-type ToastSeverity = "error" | "warning" | "info" | "success";
-type Toast = { msg: string; severity: ToastSeverity } | null;
-
-const IDLE_RELEASE_SECONDS = Number(import.meta.env.VITE_IDLE_RELEASE_SECONDS ?? 90);
+  | { kind: "progress"; order: Order; startingCaneId: number | null };
 
 export default function App() {
   const [screen, setScreen] = useState<Screen>({ kind: "loading" });
   const [me, setMe] = useState<Me | null>(null);
   const [catalogue, setCatalogue] = useState<Catalogue | null>(null);
+  const [selectedPlant, setSelectedPlant] = useState<Plant | null>(null);
   const [draft, setDraft] = useState<DraftCane[]>([]);
-  const [toast, setToast] = useState<Toast>(null);
   const [idleDeadline, setIdleDeadline] = useState<number | null>(null);
   const wsRef = useRef<WebSocket | null>(null);
 
-  const showToast = useCallback((msg: string, severity: ToastSeverity) => {
-    setToast({ msg, severity });
-  }, []);
+  const { toastProps, showToast } = useToast();
 
   const refreshMe = useCallback(async () => {
     try {
@@ -60,11 +54,11 @@ export default function App() {
       const [m, c] = await Promise.all([getMe(), getCatalogue()]);
       setMe(m);
       setCatalogue(c);
-      setScreen({ kind: "home" });
+      setScreen({ kind: "qr_scan" });
     } catch (err) {
       console.error("bootstrap.error", err);
       showToast("Could not load the app. Is the server running?", "error");
-      setScreen({ kind: "home" });
+      setScreen({ kind: "qr_scan" });
     }
   }, [showToast]);
 
@@ -72,7 +66,38 @@ export default function App() {
     void bootstrap();
   }, [bootstrap]);
 
-  const plant: Plant | null = catalogue?.plants[0] ?? null;
+  const plant: Plant | null = selectedPlant ?? catalogue?.plants[0] ?? null;
+
+  const enterHome = useCallback((plant: Plant, tap: Tap) => {
+    setSelectedPlant(plant);
+    const key = `${tap.id}-init-${Date.now()}`;
+    setDraft([{ key, tap_id: tap.id, litres: "10" }]);
+    setScreen({ kind: "home" });
+  }, []);
+
+  const onQRScanned = useCallback(
+    (plant: Plant, tap: Tap) => {
+      enterHome(plant, tap);
+    },
+    [enterHome],
+  );
+
+  const onBypass = useCallback(() => {
+    if (!catalogue) return;
+    const p = catalogue.plants[0];
+    const t = p?.taps[0];
+    if (!p || !t) {
+      showToast("No plant/tap available in catalogue.", "error");
+      return;
+    }
+    enterHome(p, t);
+  }, [catalogue, enterHome, showToast]);
+
+  const backToScan = useCallback(() => {
+    setDraft([]);
+    setSelectedPlant(null);
+    setScreen({ kind: "qr_scan" });
+  }, []);
 
   const resetToHome = useCallback(async () => {
     if (wsRef.current) {
@@ -81,8 +106,9 @@ export default function App() {
     }
     setIdleDeadline(null);
     setDraft([]);
+    setSelectedPlant(null);
     await refreshMe();
-    setScreen({ kind: "home" });
+    setScreen({ kind: "qr_scan" });
   }, [refreshMe]);
 
   const applyFrame = useCallback(
@@ -102,9 +128,6 @@ export default function App() {
         });
         return { ...prev, order: { ...prev.order, canes } };
       });
-      // Terminal frames may move the wallet (credit refund on stop/fail, or
-      // no-op on complete) or the daily-hold counter — always resync /me so
-      // the header matches the DB.
       if (frame.status !== "dispensing") {
         void refreshMe();
       }
@@ -113,7 +136,8 @@ export default function App() {
   );
 
   const armIdle = useCallback(() => {
-    setIdleDeadline(Date.now() + IDLE_RELEASE_SECONDS * 1000);
+    const secs = Number(import.meta.env.VITE_IDLE_RELEASE_SECONDS ?? 90);
+    setIdleDeadline(Date.now() + secs * 1000);
   }, []);
 
   const onConfirm = useCallback(async () => {
@@ -145,7 +169,7 @@ export default function App() {
     } catch (err) {
       const e = err as ApiErr;
       console.error("order.error", e);
-      showToast(e.message ?? "Order failed.", "error");
+      showToast(e.message ?? "Could not start session.", "error");
       setScreen({ kind: "home" });
     }
   }, [plant, draft, refreshMe, applyFrame, armIdle, showToast]);
@@ -168,8 +192,8 @@ export default function App() {
       } catch (err) {
         const e = err as ApiErr;
         console.error("start.error", e);
-        const sev: ToastSeverity = e.code === "retry_limit" ? "warning" : "error";
-        showToast(e.message ?? "Could not start.", sev);
+        const sev = e.code === "retry_limit" ? "warning" : "error";
+        showToast(e.message ?? "Could not start fill.", sev);
         setScreen((prev) =>
           prev.kind === "progress" ? { ...prev, startingCaneId: null } : prev,
         );
@@ -189,7 +213,7 @@ export default function App() {
           return { ...prev, order: { ...prev.order, canes } };
         });
         await refreshMe();
-        showToast("Stopped. Unused litres refunded.", "info");
+        showToast("Stopped. Unused credit returned.", "info");
       } catch (err) {
         const e = err as ApiErr;
         showToast(e.message ?? "Could not stop.", "error");
@@ -203,14 +227,37 @@ export default function App() {
     try {
       await cancelOrder(screen.order.id);
       await refreshMe();
-      showToast("Holds returned.", "info");
+      showToast("Unfilled canes cancelled. Credit returned.", "info");
     } catch (err) {
       const e = err as ApiErr;
       showToast(e.message ?? "Cancel failed.", "error");
     }
   }, [screen, refreshMe, showToast]);
 
-  if (screen.kind === "loading" || !plant || !me) {
+  if (screen.kind === "loading") {
+    return (
+      <div className="min-h-full w-full flex items-center justify-center p-6">
+        <CircularProgress />
+      </div>
+    );
+  }
+
+  if (screen.kind === "qr_scan") {
+    return (
+      <div className="min-h-full w-full flex items-start justify-center p-4 sm:p-6">
+        <main className="w-full max-w-md flex flex-col gap-4">
+          <QRScanScreen
+            catalogue={catalogue}
+            onScanned={onQRScanned}
+            onBypass={onBypass}
+          />
+        </main>
+        <Toast {...toastProps} />
+      </div>
+    );
+  }
+
+  if (!plant || !me) {
     return (
       <div className="min-h-full w-full flex items-center justify-center p-6">
         <CircularProgress />
@@ -221,14 +268,6 @@ export default function App() {
   return (
     <div className="min-h-full w-full flex items-start justify-center p-4 sm:p-6">
       <main className="w-full max-w-3xl flex flex-col gap-4">
-        <Typography
-          variant="overline"
-          className="tracking-widest"
-          sx={{ color: "text.secondary" }}
-        >
-          SmartFlow · V1.1
-        </Typography>
-
         <WalletHeader me={me} />
 
         {screen.kind === "home" || screen.kind === "submitting" ? (
@@ -238,6 +277,7 @@ export default function App() {
             draft={draft}
             onChange={setDraft}
             onConfirm={onConfirm}
+            onBack={backToScan}
             submitting={screen.kind === "submitting"}
           />
         ) : (
@@ -253,24 +293,7 @@ export default function App() {
           />
         )}
       </main>
-
-      <Snackbar
-        open={toast !== null}
-        autoHideDuration={5000}
-        onClose={() => setToast(null)}
-        anchorOrigin={{ vertical: "bottom", horizontal: "center" }}
-      >
-        {toast ? (
-          <Alert
-            onClose={() => setToast(null)}
-            severity={toast.severity}
-            variant="filled"
-            sx={{ width: "100%" }}
-          >
-            {toast.msg}
-          </Alert>
-        ) : undefined}
-      </Snackbar>
+      <Toast {...toastProps} />
     </div>
   );
 }
