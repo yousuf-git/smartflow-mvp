@@ -2,7 +2,7 @@
 
 Living document. Every tool, library, runtime, or service adopted anywhere in the MVP (`smartflow.server/`, `smartflow.web/`, `smartflow.iot/`, infra) is pinned here with its version and the reason it was chosen. Add new entries as they are introduced; do not silently upgrade a pinned version — bump it here in the same change that bumps it in the lockfile.
 
-- **Last updated**: 2026-04-23
+- **Last updated**: 2026-04-24
 - **Policy**: versions below are the latest stable releases at the time each row was added. "Latest stable" is a snapshot, not a promise — pin the version in `package.json` / `pyproject.toml` / `requirements.txt` and only change it deliberately.
 
 ---
@@ -27,8 +27,10 @@ Living document. Every tool, library, runtime, or service adopted anywhere in th
 | `pydantic-settings` | 2.14.0 | `.env`-driven config. |
 | `python-dotenv` | 1.2.2 | Loads `.env` in local dev. |
 | `httpx` | 0.28.1 | Any outbound HTTP (reserved — not required by V1 flow, but standard). |
+| `sqlalchemy[asyncio]` | 2.0.36 | Async ORM + core. Introduced in V1.1 for the wallet/purchase/transaction model. |
+| `asyncpg` | 0.30.0 | Async Postgres driver used by SQLAlchemy. |
 
-**Not used in V1** (called out so nobody pulls them in by reflex): SQLAlchemy, alembic, asyncpg, redis, stripe, boto3. They will land in later versions when a DB / wallet / provisioning feature is introduced.
+**Not used yet** (called out so nobody pulls them in by reflex): alembic, redis, stripe, boto3. They land when their feature arrives — Alembic once the schema gets big enough to need migrations (V1.1 uses `Base.metadata.create_all()` + idempotent seed at startup).
 
 ### Tooling
 
@@ -87,9 +89,10 @@ Deferred in V1. The device is represented by manual MQTT publishes from Postman 
 
 | Service | Purpose | Notes |
 |---|---|---|
-| AWS IoT Core | Managed MQTT broker over TLS. | Mutual TLS with X.509 device certs. Topics scoped per device. |
-| Postman (MQTT feature) | V1 device stand-in. | Used to hand-publish `ack` and `progress` messages during development. |
-| AWS IoT Core MQTT test client | V1 device stand-in (alt). | Browser-based publisher inside the AWS console. |
+| AWS IoT Core | Managed MQTT broker over TLS. | Mutual TLS with X.509 device certs. Topics scoped per plant. |
+| PostgreSQL | Primary data store (V1.1+). | Local Postgres in dev; connection string is the only knob, so Supabase/RDS/Cloud SQL swap in by env change. |
+| Postman (MQTT feature) | Device stand-in during early versions. | Used to hand-publish `ack` and `progress` messages during development. |
+| AWS IoT Core MQTT test client | Device stand-in (alt). | Browser-based publisher inside the AWS console. |
 
 ---
 
@@ -102,9 +105,9 @@ Deferred in V1. The device is represented by manual MQTT publishes from Postman 
 
 ---
 
-## 7. Out-of-scope for V1 (tracked here so we don't accidentally pull them in)
+## 7. Out-of-scope for V1.1 (tracked here so we don't accidentally pull them in)
 
-Auth servers, Redis, Postgres, SQLAlchemy, Alembic, Stripe SDK, AWS SDK (`boto3`), AWS Amplify, Next.js, Zustand, React Router, Radix UI, Shadcn. Each will be justified on a row of its own when the version that needs it arrives.
+Auth servers, Redis, Alembic, Stripe SDK, AWS SDK (`boto3`), AWS Amplify, Next.js, Zustand, React Router, Radix UI, Shadcn. Each will be justified on a row of its own when the version that needs it arrives.
 
 ---
 
@@ -113,3 +116,4 @@ Auth servers, Redis, Postgres, SQLAlchemy, Alembic, Stripe SDK, AWS SDK (`boto3`
 | Date | Change |
 |---|---|
 | 2026-04-23 | Initial stack pinned for V1: FastAPI 0.136.0, aiomqtt 2.5.1, uvicorn 0.45.0 on the server; React 19.2.0 + Vite 8.0.9 + TypeScript 6.0.3 + Tailwind 4.2.4 + MUI 9.0.0 + GSAP 3.15.0 on the web. |
+| 2026-04-24 | V1.1: added SQLAlchemy 2.0.36 (async) + asyncpg 0.30.0 on the server for Postgres-backed wallet, plants/taps, purchases and transactions. Postgres listed under infra. |
