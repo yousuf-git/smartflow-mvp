@@ -1,6 +1,10 @@
 @import "tailwindcss";
 
 @theme {
+  --color-pure-aqua: #00A3FF;
+  --color-eco-green: #10B981;
+  --color-soft-slate: #F8FAFC;
+  --color-snow-white: #FFFFFF;
   --color-aqua-50: #EEFAFD;
   --color-aqua-100: #D6F1F7;
   --color-aqua-200: #AEE3EE;
