@@ -1,15 +1,26 @@
 """
-Purchase orchestration — ties DB, wallet ledger, runtime, MQTT together.
+Purchase Orchestration & Business Logic
 
-Terminology:
-- **Cane** (UI) == **Purchase** row (DB, per target). One row per cane.
-- **Order** (UI) == **PurchaseGroup** row (V1.1 grouping layer).
+This module acts as the central coordinator for the water dispensing workflow. 
+It ties together the database models, the virtual wallet (ledger), the 
+in-memory runtime state, and MQTT communication with IoT devices.
 
-Hold model: at group creation no wallet_transactions are written; the
-`balance - hold` invariant is computed on the fly from pending/started
-Purchases. When a cane acks successfully we debit the ledger for its full
-price. On stop/fail with undelivered litres we credit back the unused
-portion.
+Key Concepts:
+- PurchaseGroup (Order): A collection of one or more canes requested by a user.
+- Purchase (Cane): A single dispensing unit with a target volume and status.
+- Hold Model: Balance is "held" (checked but not debited) when an order is created. 
+  Actual debit happens when a cane successfully starts dispensing.
+
+Workflow:
+1. `create_order`: Validates plant/tap availability and customer balance.
+2. `record_start_attempt`: Checks rate-limits for device commands.
+3. `mark_cane_started`: Debits the wallet and transitions DB state to 'started'.
+4. `apply_progress`: Updates volumes from MQTT data and handles terminal states 
+   (completed, failed, partial).
+
+Connections:
+- Used by: app.routes_customer (creation) and app.routes (WebSocket handlers).
+- Uses: app.wallet, app.runtime, app.mqtt, app.models.
 """
 
 import logging
@@ -26,21 +37,27 @@ from sqlalchemy.orm import selectinload
 from app import wallet
 from app.config import Settings
 from app.models import (
+    Controller,
+    ControllerStatus,
     Plant,
+    PlantStatus,
     Purchase,
     PurchaseGroup,
     PurchaseGroupStatus,
     PurchaseStatus,
     Tap,
+    TapStatus,
 )
 from app.runtime import registry
 
 logger = logging.getLogger(__name__)
 
-CaneSpec = tuple[int, Decimal]  # (tap_id, litres)
+# Type alias for (tap_id, target_litres)
+CaneSpec = tuple[int, Decimal]  
 
 
 class PurchaseError(Exception):
+    """Custom exception for business logic violations during the purchase flow."""
     def __init__(self, code: str, message: str, status_code: int = 400, **extra: Any) -> None:
         super().__init__(message)
         self.code = code
@@ -50,6 +67,15 @@ class PurchaseError(Exception):
 
 
 def _validate_canes(canes: list[CaneSpec], max_litres: Decimal) -> None:
+    """
+    Sanity checks for cane requests.
+    
+    Constraints:
+    - 1 to 4 canes total.
+    - Max 2 unique taps.
+    - Max 2 canes per individual tap.
+    - Volume must be > 0 and <= system maximum.
+    """
     if not canes:
         raise PurchaseError("no_canes", "At least one cane is required")
     if len(canes) > 4:
@@ -77,21 +103,61 @@ async def create_order(
     plant_id: int,
     canes: list[CaneSpec],
 ) -> PurchaseGroup:
+    """
+    Initializes a new water purchase.
+    
+    Logic:
+    1. Validates input constraints.
+    2. Verifies Plant and Controller operational status.
+    3. Verifies Tap availability (not busy, operational).
+    4. Performs wallet checks (sufficient balance and daily limit).
+    5. Snapshots current pricing and limits.
+    6. Persists the PurchaseGroup and Purchase records.
+    7. Registers the order in the in-memory 'registry' for WebSocket tracking.
+    
+    Returns:
+        The created PurchaseGroup object.
+    """
     _validate_canes(canes, Decimal(str(settings.MAX_LITRES)))
 
+    # Load infrastructure and check health
     plant = (
         await session.scalars(
-            select(Plant).where(Plant.id == plant_id).options(selectinload(Plant.taps))
+            select(Plant).where(Plant.id == plant_id).options(
+                selectinload(Plant.taps),
+                selectinload(Plant.controllers),
+            )
         )
     ).one_or_none()
+    
     if plant is None:
         raise PurchaseError("plant_not_found", f"Plant {plant_id} not found", status_code=404)
+    if plant.deleted_at is not None:
+        raise PurchaseError("plant_deleted", "Plant has been removed", status_code=400)
+    if not plant.is_active:
+        raise PurchaseError("plant_inactive", "Plant is currently inactive", status_code=400)
+    if plant.status != PlantStatus.operational:
+        raise PurchaseError("plant_not_operational", f"Plant is {plant.status.value}", status_code=400)
 
-    valid_tap_ids = {t.id for t in plant.taps}
+    # Ensure at least one controller is online
+    active_controllers = {c.id for c in plant.controllers if c.deleted_at is None and c.is_active and c.status == ControllerStatus.operational}
+    if not active_controllers:
+        raise PurchaseError("no_active_controller", "No operational controller available", status_code=400)
+
+    # Validate specific taps
+    valid_taps = {t.id: t for t in plant.taps if t.deleted_at is None}
     for tap_id, _ in canes:
-        if tap_id not in valid_tap_ids:
-            raise PurchaseError("invalid_tap", f"Tap {tap_id} not on plant {plant_id}")
+        tap = valid_taps.get(tap_id)
+        if tap is None:
+            raise PurchaseError("invalid_tap", f"Tap {tap_id} not available on plant {plant_id}")
+        if tap.status != TapStatus.operational:
+            raise PurchaseError("tap_maintenance", f"Tap {tap.label} is under maintenance", status_code=400)
+        if not tap.is_available:
+            raise PurchaseError("tap_busy", f"Tap {tap.label} is currently busy", status_code=409)
+        if tap.controller_id not in active_controllers:
+            raise PurchaseError("controller_inactive", f"Controller for tap {tap.label} is not operational", status_code=400)
 
+    # Financial checks
     customer = await wallet.load_customer(session, user_id)
     price, limit = await wallet.current_price_and_limit(session, customer)
 
@@ -104,6 +170,7 @@ async def create_order(
         await session.rollback()
         raise PurchaseError(exc.code, exc.message, status_code=402, **exc.extra) from exc
 
+    # Persist the order
     group = PurchaseGroup(
         user_id=user_id,
         plant_id=plant_id,
@@ -133,16 +200,18 @@ async def create_order(
     await session.refresh(group, attribute_names=["purchases"])
     await session.commit()
 
+    # Move to runtime state
     cane_ids = [p.id for p in group.purchases]
     await registry.register_purchase(group.id, cane_ids)
     return group
 
 
 # ---------------------------------------------------------------------------
-# Loaders
+# Database Loaders (Utility)
 # ---------------------------------------------------------------------------
 
 async def load_group(session: AsyncSession, group_id: uuid.UUID) -> PurchaseGroup | None:
+    """Loads a PurchaseGroup with its associated Purchases eagerly joined."""
     return (
         await session.scalars(
             select(PurchaseGroup)
@@ -153,6 +222,7 @@ async def load_group(session: AsyncSession, group_id: uuid.UUID) -> PurchaseGrou
 
 
 async def load_cane(session: AsyncSession, cane_id: int) -> Purchase | None:
+    """Loads a single Purchase record with a row-level lock for safe updates."""
     return (
         await session.scalars(
             select(Purchase)
@@ -163,10 +233,11 @@ async def load_cane(session: AsyncSession, cane_id: int) -> Purchase | None:
 
 
 # ---------------------------------------------------------------------------
-# Start / stop / cancel
+# Runtime State Transitions
 # ---------------------------------------------------------------------------
 
 def _has_active_cane_on_tap(group: PurchaseGroup, tap_id: int, exclude_id: int) -> bool:
+    """Checks if another cane in the same order is already dispensing on the same tap."""
     return any(
         p.tap_id == tap_id
         and p.id != exclude_id
@@ -180,6 +251,12 @@ async def record_start_attempt(
     settings: Settings,
     cane_id: int,
 ) -> Purchase:
+    """
+    Validates and logs an attempt to start dispensing water.
+    
+    Implements a sliding window rate limit for 'START' commands to prevent 
+    hardware/MQTT flooding.
+    """
     cane = await load_cane(session, cane_id)
     if cane is None:
         raise PurchaseError("cane_not_found", "Cane not found", status_code=404)
@@ -221,19 +298,35 @@ async def record_start_attempt(
 
 
 async def mark_cane_started(session: AsyncSession, cane_id: int) -> Purchase:
+    """
+    Called when a device successfully acknowledges a START command.
+    
+    This is the point where the virtual wallet is officially debited.
+    Transitions the cane to 'started' and marks the tap as unavailable.
+    """
     cane = await load_cane(session, cane_id)
     if cane is None:
         raise PurchaseError("cane_not_found", "Cane not found", status_code=404)
 
-    from app.models import Price  # local import keeps models import graph shallow
+    from app.models import Price 
     price_row = await session.get(Price, cane.price_id)
     if price_row is None:
         raise PurchaseError("price_missing", "Price snapshot missing", status_code=500)
+    
+    # Calculate exact amount based on the snapshot
     amount = (cane.litres_count * price_row.unit_price).quantize(Decimal("0.01"))
 
-    await wallet.record_debit(session, cane.user_id, amount, cane.id)
+    # Financial transaction
+    await wallet.record_debit(session, cane.user_id, amount, cane_id)
+    
     cane.status = PurchaseStatus.started
     cane.started_at = datetime.now(timezone.utc)
+
+    # Lock physical tap
+    tap = await session.get(Tap, cane.tap_id)
+    if tap is not None:
+        tap.is_available = False
+
     return cane
 
 
@@ -242,6 +335,10 @@ async def cancel_pending_canes(
     group_id: uuid.UUID,
     reason: str,
 ) -> tuple[PurchaseGroup, list[Purchase]]:
+    """
+    Cancels all 'pending' canes in an order. 
+    Started canes are unaffected (must be stopped via progress/device).
+    """
     group = (
         await session.scalars(
             select(PurchaseGroup).where(PurchaseGroup.id == group_id).with_for_update()
@@ -263,8 +360,19 @@ async def cancel_pending_canes(
             cane.reason = reason
             cane.completed_at = datetime.now(timezone.utc)
             cancelled.append(cane)
-    # No wallet_transaction writes — these were never debited.
 
+    # Release taps if no more active canes on them
+    for cane in cancelled:
+        has_active_on_tap = any(
+            c.tap_id == cane.tap_id and c.id != cane.id and c.status in (PurchaseStatus.pending, PurchaseStatus.started)
+            for c in canes
+        )
+        if not has_active_on_tap:
+            tap = await session.get(Tap, cane.tap_id)
+            if tap is not None:
+                tap.is_available = True
+
+    # Check if the whole group is now terminal
     remaining_active = any(
         c.status in (PurchaseStatus.pending, PurchaseStatus.started) for c in canes
     )
@@ -284,6 +392,7 @@ async def cancel_pending_canes(
     return group, cancelled
 
 
+# List of statuses where a cane is no longer active
 TERMINAL_STATUSES = (
     PurchaseStatus.completed,
     PurchaseStatus.partial_completed,
@@ -299,13 +408,18 @@ async def apply_progress(
     status: str,
     reason: str | None,
 ) -> Purchase | None:
-    """Apply a progress frame to a cane.
-
-    `litres_delivered` is capped at `litres_count` so the DB never records
-    more than was requested, even if firmware overshoots. If a `dispensing`
-    frame reports `litres >= litres_count`, it is promoted to `complete` so
-    the state machine converges — the caller is responsible for publishing
-    STOP to the controller.
+    """
+    Applies real-time flow data from MQTT to the database.
+    
+    Logic:
+    1. Updates `litres_delivered` (capped by requested volume).
+    2. Handles terminal status mapping:
+       - 'complete' -> PurchaseStatus.completed
+       - 'failed' -> PurchaseStatus.failed
+       - 'stopped_early' -> PurchaseStatus.partial_completed (with partial refund)
+    3. Issues refunds for undelivered water if the dispense ended prematurely.
+    4. Releases the physical tap if no other canes are pending on it.
+    5. Checks if the entire order group is now complete.
     """
     cane = await load_cane(session, cane_id)
     if cane is None:
@@ -320,23 +434,27 @@ async def apply_progress(
     capped = min(incoming, target) if target > 0 else incoming
     cane.litres_delivered = capped
 
-    # Overflow during dispensing → promote to complete.
+    # Auto-promote to complete if volume target met
     if status == "dispensing" and target > 0 and incoming >= target:
         status = "complete"
 
     if status == "dispensing":
         return cane
 
+    # Processing terminal feedback from device
     undelivered = target - capped
 
     from app.models import Price
     price_row = await session.get(Price, cane.price_id)
+    
+    # Refund undelivered portion for failures or early stops
     if price_row is not None and undelivered > 0 and status in ("failed", "stopped_early"):
         refund = (undelivered * price_row.unit_price).quantize(Decimal("0.01"))
-        await wallet.record_credit(session, cane.user_id, refund, cane.id)
+        await wallet.record_credit(session, cane.user_id, refund, cane_id)
 
     cane.completed_at = datetime.now(timezone.utc)
     cane.reason = reason
+    
     if status == "complete":
         cane.status = PurchaseStatus.completed
     elif status == "failed":
@@ -347,6 +465,20 @@ async def apply_progress(
         logger.error("progress.status.unknown id=%s status=%s", cane_id, status)
         return cane
 
+    # Release the physical tap lock
+    tap = await session.get(Tap, cane.tap_id)
+    if tap is not None:
+        has_other_active = False
+        group_for_tap = await load_group(session, cane.group_id)
+        if group_for_tap:
+            has_other_active = any(
+                p.tap_id == cane.tap_id and p.id != cane.id and p.status in (PurchaseStatus.pending, PurchaseStatus.started)
+                for p in group_for_tap.purchases
+            )
+        if not has_other_active:
+            tap.is_available = True
+
+    # Complete the group if all canes are terminal
     group = await load_group(session, cane.group_id)
     if group is not None and all(p.status in TERMINAL_STATUSES for p in group.purchases):
         group.status = PurchaseGroupStatus.completed

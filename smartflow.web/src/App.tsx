@@ -3,6 +3,11 @@ import { AuthProvider } from "./contexts/AuthContext";
 import ProtectedRoute from "./components/ProtectedRoute";
 import LandingPage from "./pages/LandingPage";
 import LoginPage from "./pages/LoginPage";
+import SignupPage from "./pages/SignupPage";
+import AdminCustomerTypes from "./pages/admin/AdminCustomerTypes";
+import AdminPrices from "./pages/admin/AdminPrices";
+import AdminLimits from "./pages/admin/AdminLimits";
+import AdminSystemLogs from "./pages/admin/AdminSystemLogs";
 import DashboardLayout from "./layouts/DashboardLayout";
 import MobileLayout from "./layouts/MobileLayout";
 import AdminDashboard from "./pages/admin/AdminDashboard";
@@ -29,6 +34,7 @@ export default function App() {
           {/* Public */}
           <Route path="/" element={<LandingPage />} />
           <Route path="/login" element={<LoginPage />} />
+          <Route path="/signup" element={<SignupPage />} />
 
           {/* Customer — mobile layout with bottom nav */}
           <Route
@@ -61,6 +67,10 @@ export default function App() {
             <Route path="plants" element={<AdminPlants />} />
             <Route path="orders" element={<AdminOrders />} />
             <Route path="transactions" element={<AdminTransactions />} />
+            <Route path="customer-types" element={<AdminCustomerTypes />} />
+            <Route path="prices" element={<AdminPrices />} />
+            <Route path="limits" element={<AdminLimits />} />
+            <Route path="system-logs" element={<AdminSystemLogs />} />
           </Route>
 
           {/* Manager */}

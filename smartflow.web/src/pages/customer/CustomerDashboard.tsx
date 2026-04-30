@@ -44,7 +44,14 @@ export default function CustomerDashboard() {
     <div className="px-4 pt-6">
       {/* Header */}
       <div className="mb-6">
-        <p className="text-sm text-slate-500">Welcome back,</p>
+        <p className="text-sm text-slate-500">
+          {(() => {
+            const h = new Date().getHours();
+            if (h < 12) return "Good morning,";
+            if (h < 17) return "Good afternoon,";
+            return "Good evening,";
+          })()}
+        </p>
         <h1 className="text-2xl font-bold text-ink-900">
           {user?.first_name} {user?.last_name}
         </h1>

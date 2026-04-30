@@ -15,11 +15,23 @@ api.interceptors.request.use((config) => {
 api.interceptors.response.use(
   (res) => res,
   (err) => {
-    if (err instanceof AxiosError && err.response?.status === 401) {
+    if (err instanceof AxiosError) {
+      const status = err.response?.status;
       const url = err.config?.url ?? "";
-      if (!url.includes("/api/auth/")) {
+
+      if (status === 401 && !url.includes("/api/auth/")) {
         localStorage.removeItem("sf_token");
         window.location.href = "/login";
+      } else if (status && status !== 401) {
+        const detail = (err.response?.data as { detail?: unknown })?.detail;
+        let msg = "Something went wrong";
+        if (typeof detail === "string") msg = detail;
+        else if (typeof detail === "object" && detail !== null) {
+          msg = (detail as { message?: string }).message ?? msg;
+        }
+        import("../contexts/ToastContext").then(({ fireGlobalToast }) => {
+          fireGlobalToast(msg, status >= 500 ? "error" : "warning");
+        });
       }
     }
     return Promise.reject(err);

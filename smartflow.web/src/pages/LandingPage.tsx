@@ -15,6 +15,7 @@ import {
   CloudCog
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import { useAuth } from "../contexts/AuthContext";
 
 const SECTIONS = [
   "hero",
@@ -32,6 +33,7 @@ export default function LandingPage() {
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [activeSection, setActiveSection] = useState(0);
   const navigate = useNavigate();
+  const { user, isLoading: authLoading } = useAuth();
   const containerRef = useRef<HTMLDivElement>(null);
   
   const { scrollYProgress } = useScroll();
@@ -106,7 +108,14 @@ export default function LandingPage() {
     navigate("/login");
   };
 
-  if (isLoading) {
+  useEffect(() => {
+    if (!authLoading && user) {
+      const redirects: Record<string, string> = { admin: "/admin", manager: "/manager", customer: "/app" };
+      navigate(redirects[user.role] ?? "/app", { replace: true });
+    }
+  }, [authLoading, user, navigate]);
+
+  if (isLoading || authLoading) {
     return <LoadingScreen />;
   }
 

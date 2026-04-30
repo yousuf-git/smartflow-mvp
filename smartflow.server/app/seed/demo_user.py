@@ -1,3 +1,16 @@
+"""
+User & Profile Seed Data
+
+This module populates the initial user accounts for different roles:
+- Admin: Global system administrator.
+- Manager: Plant-specific manager (linked to the first available plant).
+- Customer: A demo customer account with an initialized virtual wallet.
+
+Connections:
+- Used by: app.seed._run_all.
+- Logic: Idempotent 'upsert' check based on email.
+"""
+
 import logging
 from decimal import Decimal
 
@@ -28,6 +41,9 @@ async def _upsert_user(
     role: UserRole,
     plant_id: int | None = None,
 ) -> User:
+    """
+    Creates a user if they don't already exist.
+    """
     user = (
         await session.scalars(select(User).where(User.email == email))
     ).one_or_none()
@@ -47,7 +63,10 @@ async def _upsert_user(
 
 
 async def seed(session: AsyncSession, settings: Settings) -> None:
-    # Admin
+    """
+    Triggers the creation of demo accounts defined in the system settings.
+    """
+    # 1. Seed the Global Administrator
     await _upsert_user(
         session,
         email=settings.ADMIN_EMAIL,
@@ -57,7 +76,7 @@ async def seed(session: AsyncSession, settings: Settings) -> None:
         role=UserRole.admin,
     )
 
-    # Manager — linked to the first plant
+    # 2. Seed a Manager and link them to the first seeded plant.
     plant = (await session.scalars(select(Plant).limit(1))).one_or_none()
     plant_id = plant.id if plant else None
     await _upsert_user(
@@ -70,7 +89,7 @@ async def seed(session: AsyncSession, settings: Settings) -> None:
         plant_id=plant_id,
     )
 
-    # Demo customer
+    # 3. Seed a Demo Customer
     customer_user = await _upsert_user(
         session,
         email=settings.DEMO_EMAIL,
@@ -80,6 +99,7 @@ async def seed(session: AsyncSession, settings: Settings) -> None:
         role=UserRole.customer,
     )
 
+    # Initialize the Customer profile if missing.
     customer = (
         await session.scalars(select(Customer).where(Customer.user_id == customer_user.id))
     ).one_or_none()
@@ -98,6 +118,7 @@ async def seed(session: AsyncSession, settings: Settings) -> None:
         await session.flush()
         logger.info("seed.customer id=%s type=%s", customer.id, ct.name)
 
+    # Seed initial virtual balance via a credit transaction.
     existing_opening = (
         await session.scalars(
             select(WalletTransaction).where(

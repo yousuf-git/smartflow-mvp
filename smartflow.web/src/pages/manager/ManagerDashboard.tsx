@@ -95,7 +95,7 @@ export default function ManagerDashboard() {
           <StatCard
             icon={<DollarSign className="w-5 h-5" style={{ color: "#3B7A57" }} />}
             label="Total Revenue"
-            value={`PKR ${data.total_revenue.toFixed(0)}`}
+            value={`Rs. ${data.total_revenue.toFixed(0)}`}
             color="#3B7A57"
           />
           <StatCard
@@ -121,7 +121,7 @@ export default function ManagerDashboard() {
           <StatCard
             icon={<TrendingUp className="w-5 h-5" style={{ color: "#3B7A57" }} />}
             label="Today's Revenue"
-            value={`PKR ${data.today_revenue.toFixed(0)}`}
+            value={`Rs. ${data.today_revenue.toFixed(0)}`}
             color="#3B7A57"
           />
           <StatCard

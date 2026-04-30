@@ -1,3 +1,21 @@
+"""
+AWS IoT MQTT Integration & Device Communication
+
+This module manages the asynchronous MQTT client used to communicate with 
+physical dispensing hardware (e.g., ESP32 controllers). It handles the 
+secure TLS connection to AWS IoT Core and implements a pub/sub pattern for 
+command execution and real-time status updates.
+
+Topics:
+- Command: `smartflow/cmd/{controller}` - Server sends START/STOP commands.
+- Ack: `smartflow/ack/{controller}` - Device confirms receipt of a command.
+- Progress: `smartflow/progress/{controller}` - Device sends flow meter readings.
+
+Connections:
+- Used by: app.main (lifespan), app.purchase_service (to send commands).
+- Uses: app.runtime (Registry) to resolve ACKs and push progress to WebSockets.
+"""
+
 import asyncio
 import json
 import logging
@@ -15,18 +33,27 @@ logger = logging.getLogger(__name__)
 
 
 def cmd_topic(controller_name: str) -> str:
+    """Returns the MQTT topic for sending commands to a specific controller."""
     return f"smartflow/cmd/{controller_name}"
 
 
 def ack_topic(controller_name: str) -> str:
+    """Returns the MQTT topic for receiving command acknowledgments."""
     return f"smartflow/ack/{controller_name}"
 
 
 def progress_topic(controller_name: str) -> str:
+    """Returns the MQTT topic for receiving real-time dispensing progress."""
     return f"smartflow/progress/{controller_name}"
 
 
 class MQTTClient:
+    """
+    Encapsulates the aiomqtt client and its lifecycle.
+    
+    Handles automatic reconnection with exponential backoff and message 
+    dispatching to the rest of the application.
+    """
     def __init__(self, settings: Settings) -> None:
         self._settings = settings
         self._client: Optional[aiomqtt.Client] = None
@@ -34,12 +61,14 @@ class MQTTClient:
         self._ready = asyncio.Event()
 
     async def start(self) -> None:
+        """Starts the MQTT background loop task."""
         if not self._settings.mqtt_configured:
             logger.warning("mqtt.disabled reason=not-configured")
             return
         self._task = asyncio.create_task(self._run(), name="mqtt-loop")
 
     async def stop(self) -> None:
+        """Gracefully stops the MQTT client and cancels the loop task."""
         if self._task:
             self._task.cancel()
             try:
@@ -48,6 +77,12 @@ class MQTTClient:
                 pass
 
     async def publish(self, topic: str, payload: dict) -> bool:
+        """
+        Publishes a JSON payload to a specific MQTT topic.
+        
+        Returns:
+            True if published successfully, False otherwise.
+        """
         if not self._client or not self._ready.is_set():
             logger.error("mqtt.publish.not-connected topic=%s", topic)
             return False
@@ -60,10 +95,15 @@ class MQTTClient:
             return False
 
     async def _run(self) -> None:
+        """
+        The core MQTT loop. 
+        Maintains the TLS connection and listens for incoming messages.
+        """
         s = self._settings
         backoff = 1.0
         while True:
             try:
+                # Configure TLS for AWS IoT Core
                 tls_params = aiomqtt.TLSParameters(
                     ca_certs=s.AWS_IOT_CA_PATH,
                     certfile=s.AWS_IOT_CERT_PATH,
@@ -80,14 +120,19 @@ class MQTTClient:
                 ) as client:
                     self._client = client
                     backoff = 1.0
+                    
+                    # Subscribe to feedback topics
                     await client.subscribe(ack_topic(s.CONTROLLER_NAME), qos=1)
                     await client.subscribe(progress_topic(s.CONTROLLER_NAME), qos=1)
+                    
                     self._ready.set()
                     logger.info(
                         "mqtt.connected endpoint=%s controller=%s",
                         s.AWS_IOT_ENDPOINT,
                         s.CONTROLLER_NAME,
                     )
+                    
+                    # Message processing loop
                     async for message in client.messages:
                         await self._dispatch(str(message.topic), message.payload)
             except asyncio.CancelledError:
@@ -98,10 +143,19 @@ class MQTTClient:
             finally:
                 self._client = None
                 self._ready.clear()
+            
+            # Reconnection logic
             await asyncio.sleep(backoff)
             backoff = min(backoff * 2, 30.0)
 
     async def _dispatch(self, topic: str, raw: bytes) -> None:
+        """
+        Routes incoming MQTT messages based on their topic.
+        
+        Logic:
+        - ACK: Resolves pending futures in the Registry (app.runtime).
+        - Progress: Updates the DB and pushes to WebSockets.
+        """
         try:
             payload = json.loads(raw.decode())
         except Exception as exc:
@@ -127,6 +181,16 @@ class MQTTClient:
             logger.debug("mqtt.topic.unhandled topic=%s", topic)
 
     async def _handle_progress(self, cane_id: int, payload: dict) -> None:
+        """
+        Handles real-time flow data from the device.
+        
+        Logic:
+        1. Validates the incoming status.
+        2. Applies the progress to the database via purchase_service.
+        3. If the device overshoots the target volume, sends a STOP command.
+        4. Fans out the update to the connected WebSocket client.
+        5. Manages idle timers for the order.
+        """
         from decimal import Decimal
 
         from app.models import Purchase, PurchaseStatus
@@ -141,8 +205,7 @@ class MQTTClient:
 
         sm = get_sessionmaker()
         async with sm() as session:
-            # Peek at target + status BEFORE applying so we can decide whether
-            # to send a STOP to the controller for an overshoot.
+            # Overshoot protection: check if we should tell the device to stop early.
             preview = await session.get(Purchase, cane_id)
             should_stop_device = (
                 status == "dispensing"
@@ -153,6 +216,7 @@ class MQTTClient:
             )
             tap_id_for_stop = preview.tap_id if preview is not None else None
 
+            # Update database state
             cane = await purchase_service.apply_progress(
                 session, cane_id, litres=litres, status=status, reason=reason
             )
@@ -172,6 +236,8 @@ class MQTTClient:
 
             if cane is None:
                 return
+            
+            # Fan out to WebSocket clients via Registry
             frame = {
                 "cane_id": cane.id,
                 "tap_id": cane.tap_id,
@@ -181,10 +247,7 @@ class MQTTClient:
             }
             await registry.push_progress(cane_id, frame)
 
-            # If this cane was terminal and the whole group is done, cancel the
-            # idle timer so it doesn't later kick the WS. The socket stays open
-            # until the client closes it (there may still be canes the user
-            # wants to inspect).
+            # Cleanup: if the entire order (group) is finished, stop the idle disconnect timer.
             if cane.status in purchase_service.TERMINAL_STATUSES:
                 group = await purchase_service.load_group(session, cane.group_id)
                 if group is not None and all(
@@ -193,15 +256,18 @@ class MQTTClient:
                     registry.cancel_idle(cane.group_id)
 
 
+# Global singleton instance of the MQTT client.
 _mqtt_client: Optional[MQTTClient] = None
 
 
 def get_mqtt_client() -> MQTTClient:
+    """Returns the initialized global MQTT client."""
     assert _mqtt_client is not None, "MQTT client not initialised; call init_mqtt_client first"
     return _mqtt_client
 
 
 def init_mqtt_client(settings: Settings) -> MQTTClient:
+    """Initializes the global MQTT client singleton."""
     global _mqtt_client
     _mqtt_client = MQTTClient(settings)
     return _mqtt_client

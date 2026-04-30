@@ -15,13 +15,14 @@ export type AuthUser = {
   first_name: string;
   last_name: string;
   role: "admin" | "manager" | "customer";
+  phone?: string | null;
 };
 
 type AuthContextValue = {
   user: AuthUser | null;
   token: string | null;
   isLoading: boolean;
-  login: (email: string, password: string) => Promise<void>;
+  login: (email: string, password: string, rememberMe?: boolean) => Promise<void>;
   logout: () => void;
 };
 
@@ -57,10 +58,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [token]);
 
   const login = useCallback(
-    async (email: string, password: string) => {
+    async (email: string, password: string, rememberMe = false) => {
       const { data } = await api.post<{ token: string; user: AuthUser }>(
         "/api/auth/login",
-        { email, password },
+        { email, password, remember_me: rememberMe },
       );
       localStorage.setItem("sf_token", data.token);
       setToken(data.token);

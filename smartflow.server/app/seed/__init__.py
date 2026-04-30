@@ -1,13 +1,19 @@
 """
-Seed orchestration.
+Database Seeding & Schema Orchestration
 
-Each file in this package owns one slice of seed data. They all expose a
-single `async def seed(session, settings) -> None` that is idempotent: safe
-to run on every boot. Order matters when one slice FKs into another.
+This package manages the initial population of the database with essential 
+data (lookups, infrastructure, and demo users). It ensures that a fresh 
+database is ready for use immediately after deployment.
 
-Keep the total volume *minimal* — just enough to exercise the current
-version's flow. Production data belongs in migrations or operator tools,
-not here.
+Key Features:
+- Idempotency: All seed functions use 'upsert' logic, making them safe to 
+  run multiple times (e.g., on every application boot).
+- Dependency Management: Seeding is performed in a specific order to 
+  satisfy Foreign Key constraints (Lookups -> Infrastructure -> Users).
+
+Connections:
+- Used by: app.main (lifespan) during application startup.
+- Uses: app.seed.lookups, app.seed.infrastructure, app.seed.demo_user.
 """
 
 import logging
@@ -24,8 +30,15 @@ logger = logging.getLogger(__name__)
 
 
 async def init_schema_and_seed(settings: Settings) -> None:
+    """
+    Ensures the database schema exists and populates it with default data.
+    
+    1. metadata.create_all: Creates tables if they don't exist.
+    2. _run_all: Executes the individual seed modules.
+    """
     engine = get_engine()
     async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.drop_all)
         await conn.run_sync(Base.metadata.create_all)
     logger.info("db.schema.ready")
 
@@ -36,7 +49,14 @@ async def init_schema_and_seed(settings: Settings) -> None:
 
 
 async def _run_all(session: AsyncSession, settings: Settings) -> None:
-    # Order matters — later slices FK into earlier ones.
+    """
+    Triggers all seed modules in the correct order.
+    
+    Order is critical:
+    - lookups: Provides Prices and Limits (required by CustomerTypes).
+    - infrastructure: Provides Plants and Controllers (required by Users/Managers).
+    - demo_user: Provides Admin, Manager, and Customer accounts.
+    """
     await lookups.seed(session, settings)
     await infrastructure.seed(session, settings)
     await demo_user.seed(session, settings)

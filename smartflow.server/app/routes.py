@@ -1,3 +1,22 @@
+"""
+Main API Routes & WebSocket Controllers
+
+This module defines the primary API endpoints for the SmartFlow system, 
+including the order lifecycle (create, start, stop, cancel), health checks, 
+and real-time communication via WebSockets. It acts as the bridge between 
+the frontend and the business logic services.
+
+Key Endpoints:
+- /api/me: Detailed user profile and wallet status.
+- /api/catalogue: Available plants and taps for selection.
+- /api/order: CRUD and lifecycle management for water purchases.
+- /api/ws/order/{id}: Real-time progress updates for active orders.
+
+Connections:
+- Used by: Frontend application (React/Mobile).
+- Uses: app.purchase_service, app.wallet, app.mqtt, app.runtime.
+"""
+
 import asyncio
 import logging
 import uuid
@@ -40,9 +59,10 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api")
 
 
-# -- DI helpers --------------------------------------------------------------
+# -- Dependency Injection Helpers ---------------------------------------------
 
 async def db_session() -> AsyncSession:
+    """Dependency that provides an asynchronous database session."""
     sm = get_sessionmaker()
     async with sm() as session:
         yield session
@@ -51,12 +71,14 @@ async def db_session() -> AsyncSession:
 async def current_user_id(
     user: User = Depends(get_current_user),
 ) -> int:
+    """Dependency that extracts the current user's ID from the auth token."""
     return user.id
 
 
-# -- Response mappers --------------------------------------------------------
+# -- Data Transformation / Response Mapping ----------------------------------
 
 async def _cane_out(session: AsyncSession, p: Purchase) -> CaneOut:
+    """Maps a Purchase DB model to a CaneOut Pydantic schema."""
     price_row = await session.get(Price, p.price_id)
     unit = price_row.unit_price if price_row is not None else Decimal("0")
     return CaneOut(
@@ -73,6 +95,7 @@ async def _cane_out(session: AsyncSession, p: Purchase) -> CaneOut:
 
 
 async def _order_out(session: AsyncSession, g: PurchaseGroup) -> OrderOut:
+    """Maps a PurchaseGroup DB model to an OrderOut Pydantic schema."""
     canes_out = [await _cane_out(session, c) for c in g.purchases]
     total_litres = sum((c.litres_requested for c in canes_out), 0.0)
     total_price = sum((c.price for c in canes_out), 0.0)
@@ -87,26 +110,32 @@ async def _order_out(session: AsyncSession, g: PurchaseGroup) -> OrderOut:
 
 
 def _raise_purchase_error(exc: PurchaseError) -> None:
+    """Converts a PurchaseError into a FastAPI HTTPException."""
     raise HTTPException(
         status_code=exc.status_code,
         detail={"code": exc.code, "message": exc.message, **exc.extra},
     )
 
 
-# -- Health / info -----------------------------------------------------------
+# -- Generic Endpoints -------------------------------------------------------
 
 @router.get("/health")
 async def health():
+    """Simple health check endpoint."""
     return {"status": "ok"}
 
 
-# -- Me ----------------------------------------------------------------------
+# -- User Context Endpoints --------------------------------------------------
 
 @router.get("/me", response_model=MeOut)
 async def me(
     user_id: int = Depends(current_user_id),
     session: AsyncSession = Depends(db_session),
 ):
+    """
+    Returns the authenticated user's profile and current wallet snapshot.
+    Used for initializing the frontend state.
+    """
     user = await session.get(User, user_id)
     if user is None:
         raise HTTPException(status_code=404, detail="user_not_found")
@@ -134,10 +163,14 @@ async def me(
     )
 
 
-# -- Catalogue ---------------------------------------------------------------
+# -- Infrastructure Catalogue ------------------------------------------------
 
 @router.get("/catalogue", response_model=CatalogueOut)
 async def catalogue(session: AsyncSession = Depends(db_session)):
+    """
+    Returns a list of all active plants and their taps.
+    Used by customers to select where they want to dispense water.
+    """
     plants = (
         await session.scalars(select(Plant).options(selectinload(Plant.taps)))
     ).all()
@@ -153,18 +186,16 @@ async def catalogue(session: AsyncSession = Depends(db_session)):
     )
 
 
-# -- Order lifecycle ---------------------------------------------------------
+# -- Order Lifecycle Logic ---------------------------------------------------
 
 def _arm_idle(group_id: uuid.UUID, settings: Settings) -> None:
-    """Arm the idle auto-release timer for an order.
-
-    If no cane has started or progressed within `IDLE_RELEASE_SECONDS`, cancel
-    every still-`pending` cane and push a `cancelled` frame for each. The WS
-    is only closed if the order has no terminal-success canes (i.e. the whole
-    order was idle from the start); otherwise the socket stays open so the
-    client can inspect already-completed canes.
     """
-
+    Arms an automatic timeout for an order.
+    
+    If the user creates an order but never starts it (or stops halfway), this 
+    background task will eventually cancel it to release 'hold' balances 
+    and physical tap locks.
+    """
     async def _fire(gid: uuid.UUID) -> None:
         logger.info("order.idle.fire id=%s", gid)
         sm = get_sessionmaker()
@@ -178,9 +209,9 @@ def _arm_idle(group_id: uuid.UUID, settings: Settings) -> None:
                 await session.rollback()
                 return
             if not cancelled:
-                # Nothing was pending — timer is a no-op. Leave the WS alone.
                 return
             for cane in cancelled:
+                # Notify frontend about the idle cancellation
                 await registry.push_frame(
                     gid,
                     {
@@ -191,10 +222,7 @@ def _arm_idle(group_id: uuid.UUID, settings: Settings) -> None:
                         "reason": cane.reason,
                     },
                 )
-            # Close only if the whole order was idle from the start. If some
-            # canes already finished the client may still want the socket.
-            group_fully_empty = group.status == purchase_service.PurchaseGroupStatus.cancelled
-        if group_fully_empty:
+        if group.status == purchase_service.PurchaseGroupStatus.cancelled:
             await registry.close_group(gid)
 
     registry.arm_idle(group_id, settings.IDLE_RELEASE_SECONDS, _fire)
@@ -207,6 +235,10 @@ async def create_order(
     user_id: int = Depends(current_user_id),
     session: AsyncSession = Depends(db_session),
 ):
+    """
+    Creates a new water order (PurchaseGroup).
+    Triggers balance validation and arms the idle timer.
+    """
     canes: list[tuple[int, Decimal]] = [(c.tap_id, c.litres) for c in body.canes]
     try:
         group = await purchase_service.create_order(
@@ -223,6 +255,7 @@ async def get_order(
     order_id: uuid.UUID,
     session: AsyncSession = Depends(db_session),
 ):
+    """Retrieves current status of a specific order."""
     group = await purchase_service.load_group(session, order_id)
     if group is None:
         raise HTTPException(status_code=404, detail="order_not_found")
@@ -236,6 +269,14 @@ async def start_cane(
     settings: Settings = Depends(get_settings),
     session: AsyncSession = Depends(db_session),
 ):
+    """
+    Initiates water flow for a specific cane.
+    
+    1. Validates the start attempt (rate limits).
+    2. Publishes a 'START' command to MQTT.
+    3. Waits for the IoT device to acknowledge (ACK).
+    4. Upon success, marks the cane as 'started' in the DB (triggering a debit).
+    """
     try:
         cane = await purchase_service.record_start_attempt(session, settings, cane_id)
     except PurchaseError as exc:
@@ -259,6 +300,7 @@ async def start_cane(
     if not published:
         raise HTTPException(status_code=502, detail={"code": "mqtt_publish_failed"})
 
+    # Synchronous wait for asynchronous device acknowledgment
     try:
         ack = await asyncio.wait_for(ack_future, timeout=settings.ACK_TIMEOUT_SECONDS)
     except asyncio.TimeoutError:
@@ -279,6 +321,7 @@ async def start_cane(
             detail={"code": "unknown_ack", "ack": ack},
         )
 
+    # Use a fresh session for the terminal state update to avoid transaction staleness
     sm = get_sessionmaker()
     async with sm() as new_session:
         try:
@@ -299,6 +342,10 @@ async def stop_cane(
     settings: Settings = Depends(get_settings),
     session: AsyncSession = Depends(db_session),
 ):
+    """
+    Manually stops an active dispense.
+    Sends a 'STOP' command to the device and handles the partial refund logic.
+    """
     cane = await purchase_service.load_cane(session, cane_id)
     if cane is None:
         raise HTTPException(status_code=404, detail="cane_not_found")
@@ -316,11 +363,13 @@ async def stop_cane(
         {"id": cane.id, "tap_id": cane.tap_id, "action": "STOP"},
     )
 
+    # Calculate and issue partial refund for undelivered water
     from datetime import datetime, timezone as tz
     price_row = await session.get(Price, cane.price_id)
     target = cane.litres_count
     delivered = min(cane.litres_delivered, target)
     undelivered = target - delivered
+    
     if price_row is not None and undelivered > 0 and target > 0:
         refund = (undelivered * price_row.unit_price).quantize(Decimal("0.01"))
         await wallet.record_credit(session, cane.user_id, refund, cane.id)
@@ -331,6 +380,8 @@ async def stop_cane(
     await session.commit()
 
     cane_out = await _cane_out(session, cane)
+    
+    # Notify WebSocket about the manual stop
     frame = {
         "cane_id": cane.id,
         "tap_id": cane.tap_id,
@@ -340,7 +391,7 @@ async def stop_cane(
     }
     await registry.push_progress(cane.id, frame)
 
-    # If this was the last active cane, stop the idle timer from firing later.
+    # Cleanup idle timer if this ends the order
     group = await purchase_service.load_group(session, cane.group_id)
     if group is not None and all(
         p.status in purchase_service.TERMINAL_STATUSES for p in group.purchases
@@ -355,6 +406,10 @@ async def cancel_order(
     order_id: uuid.UUID,
     session: AsyncSession = Depends(db_session),
 ):
+    """
+    Cancels an entire order if it hasn't started yet.
+    Releases any 'hold' balances and physical tap locks.
+    """
     try:
         _, cancelled = await purchase_service.cancel_pending_canes(
             session, order_id, reason="user_cancelled"
@@ -378,10 +433,18 @@ async def cancel_order(
     return {"cancelled": [c.id for c in cancelled]}
 
 
-# -- WebSocket ---------------------------------------------------------------
+# -- Real-time Progress Monitoring (WebSockets) -------------------------------
 
 @router.websocket("/ws/order/{order_id}")
 async def order_ws(websocket: WebSocket, order_id: uuid.UUID):
+    """
+    WebSocket endpoint that streams real-time status updates for a specific order.
+    
+    Updates include:
+    - Flow meter readings (progress).
+    - Status changes (started, completed, failed).
+    - Cancellation events.
+    """
     rt = registry.get(order_id)
     if rt is None:
         await websocket.close(code=4404)
@@ -390,6 +453,7 @@ async def order_ws(websocket: WebSocket, order_id: uuid.UUID):
     logger.info("ws.connected order=%s", order_id)
     try:
         while True:
+            # Block until a new frame is available in the order's runtime queue
             frame = await rt.ws_queue.get()
             if frame.get("__close__"):
                 break

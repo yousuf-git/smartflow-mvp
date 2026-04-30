@@ -1,8 +1,8 @@
 import { useEffect, useState } from "react";
 import { Paper, Button, CircularProgress, Chip } from "@mui/material";
 import {
-  User,
   Mail,
+  Phone,
   Droplets,
   Wallet,
   Shield,
@@ -57,16 +57,17 @@ export default function CustomerProfile() {
       <div className="space-y-3 mb-6">
         {[
           { icon: Mail, label: "Email", value: user.email },
+          ...(user.phone ? [{ icon: Phone, label: "Phone", value: user.phone }] : []),
           {
             icon: Shield,
             label: "Account Type",
-            value: dash ? "Normal" : "—",
+            value: dash ? `${dash.currency} ${dash.price_per_litre}/L tier` : "—",
           },
           {
             icon: Wallet,
             label: "Balance",
             value: dash
-              ? `${dash.currency} ${dash.balance.toFixed(0)}`
+              ? `Rs. ${dash.balance.toFixed(0)}`
               : "—",
           },
           {
@@ -80,7 +81,7 @@ export default function CustomerProfile() {
             icon: Droplets,
             label: "Price Rate",
             value: dash
-              ? `${dash.price_per_litre.toFixed(0)} ${dash.currency}/L`
+              ? `Rs. ${dash.price_per_litre.toFixed(0)}/L`
               : "—",
           },
         ].map((item) => (

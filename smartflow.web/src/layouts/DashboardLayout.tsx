@@ -17,6 +17,9 @@ import {
   Menu,
   LogOut,
   X,
+  Tags,
+  Gauge,
+  ScrollText,
   type LucideIcon,
 } from "lucide-react";
 import { useAuth } from "../contexts/AuthContext";
@@ -34,6 +37,10 @@ const ADMIN_NAV: NavItem[] = [
   { path: "/admin/plants", label: "Plants", icon: Droplets },
   { path: "/admin/orders", label: "Orders", icon: Receipt },
   { path: "/admin/transactions", label: "Transactions", icon: DollarSign },
+  { path: "/admin/customer-types", label: "Customer Types", icon: Tags },
+  { path: "/admin/prices", label: "Prices", icon: DollarSign },
+  { path: "/admin/limits", label: "Limits", icon: Gauge },
+  { path: "/admin/system-logs", label: "System Logs", icon: ScrollText },
 ];
 
 const MANAGER_NAV: NavItem[] = [
@@ -160,7 +167,7 @@ export default function DashboardLayout({ role }: Props) {
         <Drawer
           open={mobileOpen}
           onClose={() => setMobileOpen(false)}
-          PaperProps={{ sx: { width: 264, border: "none" } }}
+          slotProps={{ paper: { sx: { width: 264, border: "none" } } }}
         >
           {sidebar}
         </Drawer>

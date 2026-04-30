@@ -1,3 +1,22 @@
+"""
+Plant Manager API Endpoints
+
+This module defines endpoints for users with the 'manager' role. Managers are 
+assigned to a specific plant and can monitor its health, update the status 
+of its controllers and taps, and manage its operating hours.
+
+Endpoints:
+- GET /api/manager/dashboard: Metrics for the assigned plant.
+- GET /api/manager/plant: Full infrastructure details for the assigned plant.
+- PUT /api/manager/plant/status: Toggle plant operational status.
+- PUT /api/manager/taps/{id}/status: Mark specific taps for maintenance.
+- CRUD /api/manager/operating-hours: Define when the plant is open.
+
+Connections:
+- Used by: Manager Web Dashboard.
+- Uses: app.models, app.schemas, app.auth, app.system_log.
+"""
+
 import logging
 from datetime import date, datetime, timezone
 from decimal import Decimal
@@ -11,15 +30,18 @@ from app.auth import require_role
 from app.db import get_sessionmaker
 from app.models import (
     Controller,
+    ControllerStatus,
     Customer,
     OperatingHour,
     Plant,
+    PlantStatus,
     Price,
     Purchase,
     PurchaseGroup,
     PurchaseGroupStatus,
     PurchaseStatus,
     Tap,
+    TapStatus,
     User,
     UserRole,
     WalletTransaction,
@@ -29,11 +51,15 @@ from app.schemas import (
     ControllerOut,
     CustomerListOut,
     ManagerDashboardOut,
+    OperatingHourCreateIn,
     OperatingHourOut,
+    OperatingHourUpdateIn,
     OrderListOut,
     PlantDetailOut,
+    StatusUpdateIn,
     TapDetailOut,
 )
+from app.system_log import log_event
 from app import wallet
 
 logger = logging.getLogger(__name__)
@@ -41,12 +67,14 @@ router = APIRouter(prefix="/api/manager", tags=["manager"])
 
 
 async def _db():
+    """Internal dependency for manager-specific DB operations."""
     sm = get_sessionmaker()
     async with sm() as s:
         yield s
 
 
 def _require_plant(user: User) -> int:
+    """Ensures the manager has an assigned plant_id."""
     if user.plant_id is None:
         raise HTTPException(status_code=403, detail="no_plant_assigned")
     return user.plant_id
@@ -57,6 +85,10 @@ async def manager_dashboard(
     user: User = Depends(require_role(UserRole.manager)),
     session: AsyncSession = Depends(_db),
 ):
+    """
+    Aggregates performance metrics for the manager's assigned plant.
+    Includes total/today revenue, volume dispensed, and active session counts.
+    """
     plant_id = _require_plant(user)
     plant = await session.get(Plant, plant_id)
     if not plant:
@@ -79,6 +111,7 @@ async def manager_dashboard(
     )
     total_litres = float(litres_row or 0)
 
+    # Revenue calculation: Debits linked to purchases at this plant
     revenue_row = await session.scalar(
         select(func.coalesce(func.sum(WalletTransaction.amount), 0))
         .select_from(WalletTransaction)
@@ -95,6 +128,7 @@ async def manager_dashboard(
         .where(PurchaseGroup.plant_id == plant_id, PurchaseGroup.created_at >= today_start)
     )) or 0
 
+    # Net revenue today (Debits - Refunds)
     today_debits = await session.scalar(
         select(func.coalesce(func.sum(WalletTransaction.amount), 0))
         .select_from(WalletTransaction)
@@ -127,7 +161,7 @@ async def manager_dashboard(
     )) or 0
 
     tap_count = (await session.scalar(
-        select(func.count(Tap.id)).where(Tap.plant_id == plant_id)
+        select(func.count(Tap.id)).where(Tap.plant_id == plant_id, Tap.deleted_at.is_(None))
     )) or 0
 
     return ManagerDashboardOut(
@@ -147,6 +181,10 @@ async def manager_plant(
     user: User = Depends(require_role(UserRole.manager)),
     session: AsyncSession = Depends(_db),
 ):
+    """
+    Returns full configuration and status of the manager's assigned plant.
+    Includes all child controllers, taps, and operating hour schedules.
+    """
     plant_id = _require_plant(user)
     plant = (
         await session.scalars(
@@ -158,25 +196,32 @@ async def manager_plant(
     if not plant:
         raise HTTPException(status_code=404, detail="plant_not_found")
 
-    ctrl = plant.controllers[0] if plant.controllers else None
+    controllers = [c for c in plant.controllers if c.deleted_at is None]
+    taps = [t for t in plant.taps if t.deleted_at is None]
+
     hours = (await session.scalars(
         select(OperatingHour).where(OperatingHour.plant_id == plant.id).order_by(OperatingHour.day_of_week)
     )).all()
     return PlantDetailOut(
         id=plant.id,
         name=plant.name,
+        city=plant.city,
+        province=plant.province,
+        area=plant.area,
+        address=plant.address,
         status=plant.status.value,
         is_active=plant.is_active,
-        controller=ControllerOut(
-            id=ctrl.id, name=ctrl.name, status=ctrl.status.value
-        ) if ctrl else None,
+        controllers=[
+            ControllerOut(id=c.id, name=c.name, com_id=c.com_id, status=c.status.value, is_active=c.is_active)
+            for c in controllers
+        ],
         taps=[
-            TapDetailOut(id=t.id, label=t.label, status=t.status.value, is_available=t.is_available)
-            for t in plant.taps
+            TapDetailOut(id=t.id, label=t.label, status=t.status.value, is_available=t.is_available, gpio_pin_number=t.gpio_pin_number)
+            for t in taps
         ],
         operating_hours=[
             OperatingHourOut(
-                day_of_week=h.day_of_week, opening_time=h.opening_time,
+                id=h.id, day_of_week=h.day_of_week, opening_time=h.opening_time,
                 closing_time=h.closing_time, is_closed=h.is_closed
             )
             for h in hours
@@ -184,12 +229,166 @@ async def manager_plant(
     )
 
 
+# -- Infrastructure Control Endpoints ----------------------------------------
+
+@router.put("/plant/status")
+async def update_plant_status(
+    body: StatusUpdateIn,
+    user: User = Depends(require_role(UserRole.manager)),
+    session: AsyncSession = Depends(_db),
+):
+    """Updates the operational status of the entire plant."""
+    plant_id = _require_plant(user)
+    plant = await session.get(Plant, plant_id)
+    if not plant:
+        raise HTTPException(status_code=404, detail="plant_not_found")
+
+    try:
+        plant.status = PlantStatus(body.status)
+    except ValueError:
+        raise HTTPException(status_code=400, detail=f"Invalid status: {body.status}")
+
+    if body.is_active is not None:
+        plant.is_active = body.is_active
+
+    await log_event(session, "info", f"Manager updated plant status: {plant.name} → {body.status}", "manager.plant.status", user.id)
+    await session.commit()
+    return {"ok": True}
+
+
+@router.put("/taps/{tap_id}/status")
+async def update_tap_status(
+    tap_id: int,
+    body: StatusUpdateIn,
+    user: User = Depends(require_role(UserRole.manager)),
+    session: AsyncSession = Depends(_db),
+):
+    """Updates the maintenance status of a specific tap."""
+    plant_id = _require_plant(user)
+    tap = await session.get(Tap, tap_id)
+    if tap is None or tap.deleted_at is not None or tap.plant_id != plant_id:
+        raise HTTPException(status_code=404, detail="tap_not_found")
+
+    try:
+        tap.status = TapStatus(body.status)
+    except ValueError:
+        raise HTTPException(status_code=400, detail=f"Invalid status: {body.status}")
+
+    await log_event(session, "info", f"Manager updated tap status: {tap.label} → {body.status}", "manager.tap.status", user.id)
+    await session.commit()
+    return {"ok": True}
+
+
+@router.put("/controllers/{controller_id}/status")
+async def update_controller_status(
+    controller_id: int,
+    body: StatusUpdateIn,
+    user: User = Depends(require_role(UserRole.manager)),
+    session: AsyncSession = Depends(_db),
+):
+    """Updates the status or enables/disables a specific IoT controller."""
+    plant_id = _require_plant(user)
+    ctrl = await session.get(Controller, controller_id)
+    if ctrl is None or ctrl.deleted_at is not None or ctrl.plant_id != plant_id:
+        raise HTTPException(status_code=404, detail="controller_not_found")
+
+    try:
+        ctrl.status = ControllerStatus(body.status)
+    except ValueError:
+        raise HTTPException(status_code=400, detail=f"Invalid status: {body.status}")
+
+    if body.is_active is not None:
+        ctrl.is_active = body.is_active
+
+    await log_event(session, "info", f"Manager updated controller status: {ctrl.name} → {body.status}", "manager.controller.status", user.id)
+    await session.commit()
+    return {"ok": True}
+
+
+# -- Operating Hours Management ----------------------------------------------
+
+@router.post("/operating-hours", status_code=201)
+async def create_operating_hour(
+    body: OperatingHourCreateIn,
+    user: User = Depends(require_role(UserRole.manager)),
+    session: AsyncSession = Depends(_db),
+):
+    """Adds a new time slot to the plant's operating schedule."""
+    plant_id = _require_plant(user)
+    oh = OperatingHour(
+        plant_id=plant_id,
+        day_of_week=body.day_of_week,
+        opening_time=body.opening_time,
+        closing_time=body.closing_time,
+        is_closed=body.is_closed,
+    )
+    session.add(oh)
+    await session.flush()
+    await log_event(session, "info", f"Manager created operating hour day={body.day_of_week}", "manager.hours.create", user.id)
+    await session.commit()
+    return OperatingHourOut(
+        id=oh.id, day_of_week=oh.day_of_week, opening_time=oh.opening_time,
+        closing_time=oh.closing_time, is_closed=oh.is_closed,
+    )
+
+
+@router.put("/operating-hours/{hour_id}")
+async def update_operating_hour(
+    hour_id: int,
+    body: OperatingHourUpdateIn,
+    user: User = Depends(require_role(UserRole.manager)),
+    session: AsyncSession = Depends(_db),
+):
+    """Modifies an existing operating hour record."""
+    plant_id = _require_plant(user)
+    oh = await session.get(OperatingHour, hour_id)
+    if oh is None or oh.plant_id != plant_id:
+        raise HTTPException(status_code=404, detail="operating_hour_not_found")
+
+    if body.day_of_week is not None:
+        oh.day_of_week = body.day_of_week
+    if body.opening_time is not None:
+        oh.opening_time = body.opening_time
+    if body.closing_time is not None:
+        oh.closing_time = body.closing_time
+    if body.is_closed is not None:
+        oh.is_closed = body.is_closed
+
+    await log_event(session, "info", f"Manager updated operating hour id={hour_id}", "manager.hours.update", user.id)
+    await session.commit()
+    return OperatingHourOut(
+        id=oh.id, day_of_week=oh.day_of_week, opening_time=oh.opening_time,
+        closing_time=oh.closing_time, is_closed=oh.is_closed,
+    )
+
+
+@router.delete("/operating-hours/{hour_id}")
+async def delete_operating_hour(
+    hour_id: int,
+    user: User = Depends(require_role(UserRole.manager)),
+    session: AsyncSession = Depends(_db),
+):
+    """Removes a time slot from the plant's schedule."""
+    plant_id = _require_plant(user)
+    oh = await session.get(OperatingHour, hour_id)
+    if oh is None or oh.plant_id != plant_id:
+        raise HTTPException(status_code=404, detail="operating_hour_not_found")
+
+    await session.delete(oh)
+    await log_event(session, "info", f"Manager deleted operating hour id={hour_id}", "manager.hours.delete", user.id)
+    await session.commit()
+    return {"ok": True}
+
+
+# -- Read-only Data Access ---------------------------------------------------
+
 @router.get("/orders", response_model=list[OrderListOut])
 async def manager_orders(
     status: str | None = Query(None),
     user: User = Depends(require_role(UserRole.manager)),
     session: AsyncSession = Depends(_db),
 ):
+    """Lists water orders placed at the manager's assigned plant."""
     plant_id = _require_plant(user)
     q = (
         select(PurchaseGroup)
@@ -229,8 +428,10 @@ async def manager_customers(
     user: User = Depends(require_role(UserRole.manager)),
     session: AsyncSession = Depends(_db),
 ):
+    """Lists all customers who have used the manager's assigned plant."""
     plant_id = _require_plant(user)
 
+    # Find unique user IDs who have ordered at this plant
     customer_user_ids = (
         await session.scalars(
             select(PurchaseGroup.user_id)
@@ -245,7 +446,10 @@ async def manager_customers(
     customers = (
         await session.scalars(
             select(Customer)
-            .where(Customer.user_id.in_(customer_user_ids))
+            .where(
+                Customer.user_id.in_(customer_user_ids),
+                Customer.user.has(User.deleted_at.is_(None)),
+            )
             .options(
                 selectinload(Customer.user),
                 selectinload(Customer.customer_type),

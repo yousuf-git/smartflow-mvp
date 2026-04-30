@@ -19,13 +19,26 @@ export type OperatingHour = {
   is_closed: boolean;
 };
 
+export type CustomerTap = {
+  id: number;
+  label: string;
+  status: string;
+  is_available: boolean;
+  is_busy: boolean;
+};
+
 export type CustomerPlant = {
   id: number;
   name: string;
+  city: string;
+  province: string;
+  area: string;
+  address: string;
   status: string;
   is_active: boolean;
   tap_count: number;
   available_taps: number;
+  taps: CustomerTap[];
   operating_hours: OperatingHour[];
 };
 

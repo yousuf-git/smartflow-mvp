@@ -6,11 +6,13 @@ import {
   CircularProgress,
   IconButton,
   InputAdornment,
+  FormControlLabel,
+  Checkbox,
 } from "@mui/material";
 import { motion } from "framer-motion";
 import { Droplets, Eye, EyeOff, Mail, Lock } from "lucide-react";
 import { useAuth } from "../contexts/AuthContext";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 
 function WavePattern() {
   return (
@@ -91,6 +93,7 @@ export default function LoginPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
+  const [rememberMe, setRememberMe] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
@@ -121,7 +124,7 @@ export default function LoginPage() {
     }
     setLoading(true);
     try {
-      await login(email.trim(), password);
+      await login(email.trim(), password, rememberMe);
     } catch (err: unknown) {
       const detail =
         (err as { response?: { data?: { detail?: string } } })?.response?.data
@@ -199,7 +202,7 @@ export default function LoginPage() {
       </div>
 
       {/* Right form panel */}
-      <div className="flex-1 flex items-center justify-center p-6 sm:p-12 bg-paper">
+      <div className="flex-1 flex items-center justify-center p-8 sm:p-12 bg-paper">
         <div className="w-full max-w-md">
           {/* Mobile logo */}
           <div className="flex items-center gap-2.5 mb-8 lg:hidden">
@@ -225,7 +228,7 @@ export default function LoginPage() {
           <form onSubmit={handleSubmit} className="space-y-5">
             <TextField
               fullWidth
-              label="Email"
+              placeholder="Email"
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
@@ -244,7 +247,7 @@ export default function LoginPage() {
 
             <TextField
               fullWidth
-              label="Password"
+              placeholder="Password"
               type={showPassword ? "text" : "password"}
               value={password}
               onChange={(e) => setPassword(e.target.value)}
@@ -275,6 +278,18 @@ export default function LoginPage() {
               }}
             />
 
+            <FormControlLabel
+              control={
+                <Checkbox
+                  checked={rememberMe}
+                  onChange={(e) => setRememberMe(e.target.checked)}
+                  size="small"
+                />
+              }
+              label="Remember me"
+              slotProps={{ typography: { className: "text-sm text-ink-700" } }}
+            />
+
             <Button
               type="submit"
               variant="contained"
@@ -296,9 +311,13 @@ export default function LoginPage() {
             </Button>
           </form>
 
-          <p className="text-center text-xs text-ink-300 mt-10">
-            SmartFlow Water Conservation System
+          <p className="text-center text-sm text-ink-700 mt-6">
+            Don't have an account?{" "}
+            <Link to="/signup" className="text-aqua-600 font-medium hover:underline">
+              Sign up
+            </Link>
           </p>
+
         </div>
       </div>
     </div>

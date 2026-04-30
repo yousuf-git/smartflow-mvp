@@ -28,7 +28,9 @@ export default function CustomerPlants() {
   }
 
   const filtered = plants.filter((p) =>
-    p.name.toLowerCase().includes(search.toLowerCase()),
+    p.name.toLowerCase().includes(search.toLowerCase()) ||
+    p.city.toLowerCase().includes(search.toLowerCase()) ||
+    p.area.toLowerCase().includes(search.toLowerCase()),
   );
 
   return (
@@ -71,25 +73,19 @@ export default function CustomerPlants() {
                     <MapPin className="w-5 h-5 text-sky-500" />
                   </div>
                   <div>
-                    <h3 className="text-base font-semibold text-ink-900">
-                      {plant.name}
-                    </h3>
+                    <h3 className="text-base font-semibold text-ink-900">{plant.name}</h3>
+                    {(plant.area || plant.city) && (
+                      <p className="text-xs text-slate-400 mt-0.5">
+                        {[plant.area, plant.city, plant.province].filter(Boolean).join(", ")}
+                      </p>
+                    )}
                     <Chip
                       label={plant.status}
                       size="small"
                       sx={{
-                        mt: 0.5,
-                        fontWeight: 500,
-                        fontSize: "0.7rem",
-                        height: 22,
-                        bgcolor:
-                          plant.status === "operational"
-                            ? "#ecfdf5"
-                            : "#fef3c7",
-                        color:
-                          plant.status === "operational"
-                            ? "#059669"
-                            : "#d97706",
+                        mt: 0.5, fontWeight: 500, fontSize: "0.7rem", height: 22,
+                        bgcolor: plant.status === "operational" ? "#ecfdf5" : "#fef3c7",
+                        color: plant.status === "operational" ? "#059669" : "#d97706",
                       }}
                     />
                   </div>
@@ -104,6 +100,30 @@ export default function CustomerPlants() {
                 </div>
               </div>
 
+              {/* Individual taps */}
+              {plant.taps.length > 0 && (
+                <div className="px-4 pb-3 flex flex-wrap gap-2">
+                  {plant.taps.map((tap) => {
+                    const busy = tap.is_busy || !tap.is_available;
+                    const maintenance = tap.status !== "operational";
+                    return (
+                      <Chip
+                        key={tap.id}
+                        label={`${tap.label}${maintenance ? " (maint.)" : busy ? " (busy)" : ""}`}
+                        size="small"
+                        variant="outlined"
+                        sx={{
+                          fontSize: "0.7rem",
+                          borderColor: maintenance ? "#fca5a5" : busy ? "#fbbf24" : "#86efac",
+                          color: maintenance ? "#dc2626" : busy ? "#d97706" : "#16a34a",
+                          bgcolor: maintenance ? "#fef2f2" : busy ? "#fffbeb" : "#f0fdf4",
+                        }}
+                      />
+                    );
+                  })}
+                </div>
+              )}
+
               {/* Operating Hours */}
               {plant.operating_hours.length > 0 && (
                 <div className="px-4 pb-4">
@@ -114,25 +134,13 @@ export default function CustomerPlants() {
                   <div className="grid grid-cols-7 gap-1">
                     {plant.operating_hours.map((h) => (
                       <div
-                        key={h.day_of_week}
+                        key={`${h.day_of_week}-${h.opening_time}`}
                         className={`text-center py-1.5 rounded-lg text-[10px] ${
-                          h.is_closed
-                            ? "bg-slate-50 text-slate-400"
-                            : "bg-sky-50 text-sky-700"
+                          h.is_closed ? "bg-slate-50 text-slate-400" : "bg-sky-50 text-sky-700"
                         }`}
                       >
-                        <div className="font-semibold">
-                          {DAY_NAMES[h.day_of_week]}
-                        </div>
-                        {h.is_closed ? (
-                          <div>Off</div>
-                        ) : (
-                          <div>
-                            {h.opening_time}
-                            <br />
-                            {h.closing_time}
-                          </div>
-                        )}
+                        <div className="font-semibold">{DAY_NAMES[h.day_of_week]}</div>
+                        {h.is_closed ? <div>Off</div> : <div>{h.opening_time}<br />{h.closing_time}</div>}
                       </div>
                     ))}
                   </div>

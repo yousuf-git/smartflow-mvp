@@ -1,19 +1,22 @@
 """
-Wallet = ledger over `wallet_transactions` + live sums over in-flight purchases.
+Virtual Wallet & Financial Ledger Management
 
-- `balance`       = sum(credit) - sum(debit)
-- `hold`          = sum(price for price on pending/started Purchase rows)  [live]
-- `daily_consumed`= litres on today's terminal-success Purchase rows
-- `daily_hold`    = litres on today's pending/started Purchase rows  [live]
+This module implements the financial core of the SmartFlow system. It manages 
+a virtual currency ledger for users, tracking credits (deposits/refunds) 
+and debits (purchases). 
 
-Booking a hold only creates DB rows (Purchase), it does NOT write to
-wallet_transactions. Actual debit happens when a cane acks and starts
-dispensing — at that point we write one `debit` transaction for the cane's
-price. Refunds on partial delivery are written as `credit` transactions
-linked to the same purchase_id.
+Key Concepts:
+- Balance: The net sum of all ledger transactions (Credits - Debits).
+- Hold: The total value of in-flight purchases that have been requested but 
+  not yet debited from the ledger.
+- Daily Limit: Consumption constraints defined per CustomerType.
+- Invariants: The system ensures `Balance - Hold >= 0` and `Daily Consumed + 
+  Daily Hold + New Request <= Limit`.
 
-Pricing is looked up via the Customer → CustomerType → Price chain; the
-Customer's current CustomerType.price_id is what the purchase snapshots.
+Connections:
+- Used by: app.purchase_service (to check affordability and record transactions), 
+  app.routes_customer (to display wallet stats).
+- Uses: app.models (WalletTransaction, Customer, Price, Limit).
 """
 
 import logging
@@ -39,6 +42,7 @@ logger = logging.getLogger(__name__)
 
 
 class WalletError(Exception):
+    """Custom exception for wallet-related validation failures."""
     def __init__(self, code: str, message: str, **extra: object) -> None:
         super().__init__(message)
         self.code = code
@@ -47,10 +51,11 @@ class WalletError(Exception):
 
 
 # ---------------------------------------------------------------------------
-# Lookups
+# Database Lookups
 # ---------------------------------------------------------------------------
 
 async def load_customer(session: AsyncSession, user_id: int) -> Customer:
+    """Fetches the Customer profile linked to a User ID."""
     customer = (
         await session.scalars(select(Customer).where(Customer.user_id == user_id))
     ).one_or_none()
@@ -62,6 +67,7 @@ async def load_customer(session: AsyncSession, user_id: int) -> Customer:
 async def current_price_and_limit(
     session: AsyncSession, customer: Customer
 ) -> tuple[Price, Limit]:
+    """Retrieves the active Price and Limit records for a customer's type."""
     ct = await session.get(CustomerType, customer.customer_type_id)
     if ct is None:
         raise WalletError("customer_type_missing", "Customer type missing")
@@ -73,10 +79,11 @@ async def current_price_and_limit(
 
 
 # ---------------------------------------------------------------------------
-# Ledger reads
+# Ledger Analysis (Read-only)
 # ---------------------------------------------------------------------------
 
 async def balance(session: AsyncSession, user_id: int) -> Decimal:
+    """Calculates the current ledger balance (total credits - total debits)."""
     credit = await session.scalar(
         select(func.coalesce(func.sum(WalletTransaction.amount), 0)).where(
             WalletTransaction.user_id == user_id,
@@ -92,11 +99,15 @@ async def balance(session: AsyncSession, user_id: int) -> Decimal:
     return Decimal(credit) - Decimal(debit)
 
 
+# Statuses that count towards the 'Hold' balance
 _HOLD_STATUSES = (PurchaseStatus.pending, PurchaseStatus.started)
 
 
 async def hold(session: AsyncSession, user_id: int) -> Decimal:
-    """Sum of `litres_count * price.unit_price` for this user's in-flight purchases."""
+    """
+    Sum of projected costs for all active (pending/started) purchases.
+    Ensures users cannot spend more than they have while orders are in-flight.
+    """
     total = await session.scalar(
         select(
             func.coalesce(func.sum(Purchase.litres_count * Price.unit_price), 0)
@@ -111,6 +122,7 @@ async def hold(session: AsyncSession, user_id: int) -> Decimal:
 
 
 def _today_bounds() -> tuple[datetime, datetime]:
+    """Utility to get UTC timestamps for the start and end of the current day."""
     today = date.today()
     start = datetime.combine(today, time.min, tzinfo=timezone.utc)
     end = datetime.combine(today, time.max, tzinfo=timezone.utc)
@@ -118,7 +130,7 @@ def _today_bounds() -> tuple[datetime, datetime]:
 
 
 async def daily_consumed_litres(session: AsyncSession, user_id: int) -> Decimal:
-    """Litres on today's Purchase rows that have actually dispensed (any positive delivery)."""
+    """Calculates total litres already delivered today."""
     start, end = _today_bounds()
     total = await session.scalar(
         select(func.coalesce(func.sum(Purchase.litres_delivered), 0)).where(
@@ -131,6 +143,7 @@ async def daily_consumed_litres(session: AsyncSession, user_id: int) -> Decimal:
 
 
 async def daily_hold_litres(session: AsyncSession, user_id: int) -> Decimal:
+    """Calculates total litres requested in pending/started orders for today."""
     start, end = _today_bounds()
     total = await session.scalar(
         select(func.coalesce(func.sum(Purchase.litres_count), 0)).where(
@@ -144,7 +157,10 @@ async def daily_hold_litres(session: AsyncSession, user_id: int) -> Decimal:
 
 
 async def snapshot(session: AsyncSession, user_id: int) -> dict:
-    """One-shot wallet view for `/api/me`."""
+    """
+    Generates a comprehensive summary of a user's wallet state.
+    Used by frontend dashboards to show balance, limits, and remaining quota.
+    """
     customer = await load_customer(session, user_id)
     price, limit = await current_price_and_limit(session, customer)
     bal = await balance(session, user_id)
@@ -166,12 +182,13 @@ async def snapshot(session: AsyncSession, user_id: int) -> dict:
 
 
 # ---------------------------------------------------------------------------
-# Ledger writes (called by purchase_service)
+# Ledger Persistence (Write operations)
 # ---------------------------------------------------------------------------
 
 async def record_debit(
     session: AsyncSession, user_id: int, amount: Decimal, purchase_id: int
 ) -> WalletTransaction:
+    """Records a payment for water dispensed."""
     tx = WalletTransaction(
         user_id=user_id,
         amount=amount,
@@ -186,6 +203,7 @@ async def record_debit(
 async def record_credit(
     session: AsyncSession, user_id: int, amount: Decimal, purchase_id: int | None = None
 ) -> WalletTransaction:
+    """Records a deposit or a refund."""
     tx = WalletTransaction(
         user_id=user_id,
         amount=amount,
@@ -198,7 +216,7 @@ async def record_credit(
 
 
 # ---------------------------------------------------------------------------
-# Hold checks at purchase creation
+# Business Logic Guards
 # ---------------------------------------------------------------------------
 
 async def assert_can_afford(
@@ -207,7 +225,16 @@ async def assert_can_afford(
     price_total: Decimal,
     litres_total: Decimal,
 ) -> None:
-    """Raise WalletError if this new purchase would overdraw balance or daily limit."""
+    """
+    Performs critical pre-purchase checks.
+    
+    Validates:
+    1. The user has enough 'free' balance (Balance - Hold) to cover the cost.
+    2. The user has enough remaining daily quota to cover the volume.
+    
+    Raises:
+        WalletError: If balance is insufficient or daily limit is exceeded.
+    """
     bal = await balance(session, user_id)
     hld = await hold(session, user_id)
     free = bal - hld
@@ -224,6 +251,7 @@ async def assert_can_afford(
     consumed = await daily_consumed_litres(session, user_id)
     held_litres = await daily_hold_litres(session, user_id)
     projected = consumed + held_litres + litres_total
+    
     if projected > limit.daily_litre_limit:
         raise WalletError(
             "over_daily_limit",
