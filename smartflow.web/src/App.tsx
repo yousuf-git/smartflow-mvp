@@ -1,15 +1,86 @@
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
-import WalletApp from './WalletApp';
-import LandingPage from './pages/LandingPage';
+import { BrowserRouter as Router, Routes, Route, Navigate } from "react-router-dom";
+import { AuthProvider } from "./contexts/AuthContext";
+import ProtectedRoute from "./components/ProtectedRoute";
+import LandingPage from "./pages/LandingPage";
+import LoginPage from "./pages/LoginPage";
+import DashboardLayout from "./layouts/DashboardLayout";
+import MobileLayout from "./layouts/MobileLayout";
+import AdminDashboard from "./pages/admin/AdminDashboard";
+import AdminUsers from "./pages/admin/AdminUsers";
+import AdminCustomers from "./pages/admin/AdminCustomers";
+import AdminPlants from "./pages/admin/AdminPlants";
+import AdminOrders from "./pages/admin/AdminOrders";
+import AdminTransactions from "./pages/admin/AdminTransactions";
+import ManagerDashboard from "./pages/manager/ManagerDashboard";
+import ManagerPlant from "./pages/manager/ManagerPlant";
+import ManagerOrders from "./pages/manager/ManagerOrders";
+import ManagerCustomers from "./pages/manager/ManagerCustomers";
+import CustomerDashboard from "./pages/customer/CustomerDashboard";
+import CustomerPlants from "./pages/customer/CustomerPlants";
+import CustomerScan from "./pages/customer/CustomerScan";
+import CustomerTransactions from "./pages/customer/CustomerTransactions";
+import CustomerProfile from "./pages/customer/CustomerProfile";
 
 export default function App() {
   return (
     <Router>
-      <Routes>
-        <Route path="/" element={<LandingPage />} />
-        <Route path="/app/*" element={<WalletApp />} />
-        <Route path="*" element={<Navigate to="/" replace />} />
-      </Routes>
+      <AuthProvider>
+        <Routes>
+          {/* Public */}
+          <Route path="/" element={<LandingPage />} />
+          <Route path="/login" element={<LoginPage />} />
+
+          {/* Customer — mobile layout with bottom nav */}
+          <Route
+            path="/app"
+            element={
+              <ProtectedRoute roles={["customer"]}>
+                <MobileLayout />
+              </ProtectedRoute>
+            }
+          >
+            <Route index element={<CustomerDashboard />} />
+            <Route path="plants" element={<CustomerPlants />} />
+            <Route path="scan" element={<CustomerScan />} />
+            <Route path="transactions" element={<CustomerTransactions />} />
+            <Route path="profile" element={<CustomerProfile />} />
+          </Route>
+
+          {/* Admin */}
+          <Route
+            path="/admin"
+            element={
+              <ProtectedRoute roles={["admin"]}>
+                <DashboardLayout role="admin" />
+              </ProtectedRoute>
+            }
+          >
+            <Route index element={<AdminDashboard />} />
+            <Route path="users" element={<AdminUsers />} />
+            <Route path="customers" element={<AdminCustomers />} />
+            <Route path="plants" element={<AdminPlants />} />
+            <Route path="orders" element={<AdminOrders />} />
+            <Route path="transactions" element={<AdminTransactions />} />
+          </Route>
+
+          {/* Manager */}
+          <Route
+            path="/manager"
+            element={
+              <ProtectedRoute roles={["manager"]}>
+                <DashboardLayout role="manager" />
+              </ProtectedRoute>
+            }
+          >
+            <Route index element={<ManagerDashboard />} />
+            <Route path="plant" element={<ManagerPlant />} />
+            <Route path="orders" element={<ManagerOrders />} />
+            <Route path="customers" element={<ManagerCustomers />} />
+          </Route>
+
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Routes>
+      </AuthProvider>
     </Router>
   );
 }

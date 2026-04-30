@@ -26,8 +26,25 @@ class Settings(BaseSettings):
     CONTROLLER_NAME: str = "DEV-001"  # also the MQTT topic key
     TAPS: str = "T1:Tap 1,T2:Tap 2"
 
-    # Demo user seed
+    # JWT
+    JWT_SECRET: str = "smartflow-mvp-dev-secret-change-in-prod"
+    JWT_EXPIRE_MINUTES: int = 480
+
+    # Admin seed
+    ADMIN_EMAIL: str = "admin@smartflow.local"
+    ADMIN_PASSWORD: str = "admin123"
+    ADMIN_FIRST_NAME: str = "Admin"
+    ADMIN_LAST_NAME: str = "User"
+
+    # Manager seed
+    MANAGER_EMAIL: str = "manager@smartflow.local"
+    MANAGER_PASSWORD: str = "manager123"
+    MANAGER_FIRST_NAME: str = "Manager"
+    MANAGER_LAST_NAME: str = "User"
+
+    # Demo customer seed
     DEMO_EMAIL: str = "demo@smartflow.local"
+    DEMO_PASSWORD: str = "demo123"
     DEMO_FIRST_NAME: str = "Demo"
     DEMO_LAST_NAME: str = "User"
     DEMO_CUSTOMER_TYPE: str = "normal"

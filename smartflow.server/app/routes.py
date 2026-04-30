@@ -9,6 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app import purchase_service, wallet
+from app.auth import get_current_user
 from app.config import Settings, get_settings
 from app.db import get_sessionmaker
 from app.models import (
@@ -48,15 +49,8 @@ async def db_session() -> AsyncSession:
 
 
 async def current_user_id(
-    settings: Settings = Depends(get_settings),
-    session: AsyncSession = Depends(db_session),
+    user: User = Depends(get_current_user),
 ) -> int:
-    """Resolve the single demo user by email."""
-    user = (
-        await session.scalars(select(User).where(User.email == settings.DEMO_EMAIL))
-    ).one_or_none()
-    if user is None:
-        raise HTTPException(status_code=404, detail="demo_user_not_seeded")
     return user.id
 
 

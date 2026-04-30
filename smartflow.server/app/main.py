@@ -8,7 +8,11 @@ from app.config import get_settings
 from app.db import dispose_engine, init_engine
 from app.mqtt import init_mqtt_client
 from app.routes import router
-from app.seed import init_schema_and_seed  # package re-export
+from app.routes_admin import router as admin_router
+from app.routes_auth import router as auth_router
+from app.routes_customer import router as customer_router
+from app.routes_manager import router as manager_router
+from app.seed import init_schema_and_seed
 
 
 def _configure_logging(level: str) -> None:
@@ -33,7 +37,7 @@ async def lifespan(app: FastAPI):
         await dispose_engine()
 
 
-app = FastAPI(title="SmartFlow MVP Server", version="1.1.0", lifespan=lifespan)
+app = FastAPI(title="SmartFlow MVP Server", version="1.2.0", lifespan=lifespan)
 
 _settings = get_settings()
 app.add_middleware(
@@ -44,9 +48,13 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+app.include_router(auth_router)
 app.include_router(router)
+app.include_router(admin_router)
+app.include_router(manager_router)
+app.include_router(customer_router)
 
 
 @app.get("/")
 async def root():
-    return {"service": "smartflow-mvp-server", "version": "1.1.0"}
+    return {"service": "smartflow-mvp-server", "version": "1.2.0"}

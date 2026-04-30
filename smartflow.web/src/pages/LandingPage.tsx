@@ -103,7 +103,7 @@ export default function LandingPage() {
     if (document.fullscreenElement) {
       document.exitFullscreen();
     }
-    navigate("/app");
+    navigate("/login");
   };
 
   if (isLoading) {

@@ -12,7 +12,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import Settings
-from app.models import Controller, ControllerStatus, Plant, PlantStatus, Tap, TapStatus
+from app.models import Controller, ControllerStatus, OperatingHour, Plant, PlantStatus, Tap, TapStatus
 
 logger = logging.getLogger(__name__)
 
@@ -67,3 +67,31 @@ async def seed(session: AsyncSession, settings: Settings) -> None:
         )
         logger.info("seed.tap code=%s label=%s gpio=%s", tap_code, tap_label, idx)
     await session.flush()
+
+    existing_hours = (
+        await session.scalars(
+            select(OperatingHour).where(OperatingHour.plant_id == plant.id)
+        )
+    ).first()
+    if existing_hours is None:
+        # Mon-Fri 8:00-18:00, Sat 9:00-14:00, Sun closed
+        schedule = [
+            (0, "08:00", "18:00", False),  # Sun → closed below
+            (1, "08:00", "18:00", False),  # Mon
+            (2, "08:00", "18:00", False),  # Tue
+            (3, "08:00", "18:00", False),  # Wed
+            (4, "08:00", "18:00", False),  # Thu
+            (5, "08:00", "18:00", False),  # Fri
+            (6, "09:00", "14:00", False),  # Sat
+        ]
+        schedule[0] = (0, "00:00", "00:00", True)  # Sun closed
+        for dow, open_t, close_t, closed in schedule:
+            session.add(OperatingHour(
+                plant_id=plant.id,
+                day_of_week=dow,
+                opening_time=open_t,
+                closing_time=close_t,
+                is_closed=closed,
+            ))
+        logger.info("seed.operating_hours plant=%s", plant.id)
+        await session.flush()

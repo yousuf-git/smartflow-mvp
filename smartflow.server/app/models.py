@@ -79,6 +79,12 @@ class CustomerType(Base):
 # User & customer
 # ---------------------------------------------------------------------------
 
+class UserRole(str, enum.Enum):
+    admin = "admin"
+    manager = "manager"
+    customer = "customer"
+
+
 class User(Base):
     __tablename__ = "users"
 
@@ -86,6 +92,12 @@ class User(Base):
     email: Mapped[str] = mapped_column(String(128), unique=True)
     first_name: Mapped[str] = mapped_column(String(64))
     last_name: Mapped[str] = mapped_column(String(64))
+    password_hash: Mapped[str] = mapped_column(String(256), default="")
+    role: Mapped[UserRole] = mapped_column(
+        SAEnum(UserRole, name="user_role"), default=UserRole.customer
+    )
+    plant_id: Mapped[int | None] = mapped_column(ForeignKey("plants.id"), nullable=True)
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     customer: Mapped["Customer"] = relationship(back_populates="user", uselist=False)
@@ -252,6 +264,23 @@ class Purchase(Base):
     price: Mapped[Price] = relationship(foreign_keys=[price_id])
     limit: Mapped[Limit] = relationship(foreign_keys=[limit_id])
     tap: Mapped[Tap] = relationship()
+
+
+# ---------------------------------------------------------------------------
+# Operating hours
+# ---------------------------------------------------------------------------
+
+class OperatingHour(Base):
+    __tablename__ = "operating_hours"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    plant_id: Mapped[int] = mapped_column(ForeignKey("plants.id"))
+    day_of_week: Mapped[int] = mapped_column(Integer)  # 0=Sun … 6=Sat
+    opening_time: Mapped[str] = mapped_column(String(8), default="08:00")  # HH:MM
+    closing_time: Mapped[str] = mapped_column(String(8), default="18:00")
+    is_closed: Mapped[bool] = mapped_column(Boolean, default=False)
+
+    plant: Mapped[Plant] = relationship()
 
 
 # ---------------------------------------------------------------------------
