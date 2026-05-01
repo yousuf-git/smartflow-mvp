@@ -44,6 +44,16 @@ class Settings(BaseSettings):
     # Database Connection String (e.g., postgresql+asyncpg://user:pass@host/db)
     DATABASE_URL: str = ""
 
+    @property
+    def async_database_url(self) -> str:
+        """Heroku gives postgres://, asyncpg needs postgresql+asyncpg://."""
+        url = self.DATABASE_URL
+        if url.startswith("postgres://"):
+            url = url.replace("postgres://", "postgresql+asyncpg://", 1)
+        elif url.startswith("postgresql://"):
+            url = url.replace("postgresql://", "postgresql+asyncpg://", 1)
+        return url
+
     # Infrastructure Seed Defaults
     # Used by app.seed to populate the DB with a default plant and controller if empty.
     PLANT_NAME: str = "Demo Plant"
@@ -71,8 +81,8 @@ class Settings(BaseSettings):
     # Initial Demo Customer User Seed
     DEMO_EMAIL: str = "yousuf@smartflow.com"
     DEMO_PASSWORD: str = "demo123"
-    DEMO_FIRST_NAME: str = "Yousuf"
-    DEMO_LAST_NAME: str = "Ahmed"
+    DEMO_FIRST_NAME: str = "Muhammad"
+    DEMO_LAST_NAME: str = "Yousuf"
     DEMO_CUSTOMER_TYPE: str = "normal"
     INITIAL_BALANCE: float = 500.0
 
@@ -86,6 +96,11 @@ class Settings(BaseSettings):
     # System Integration Settings
     CORS_ORIGINS: str = "http://localhost:5173,*"
     LOG_LEVEL: str = "INFO"
+    CSC_API_KEY: str = ""
+    CSC_API_BASE_URL: str = "https://api.countrystatecity.in/v1"
+    CLOUDINARY_CLOUD_NAME: str = ""
+    CLOUDINARY_API_KEY: str = ""
+    CLOUDINARY_API_SECRET: str = ""
 
     @property
     def cors_origin_list(self) -> list[str]:

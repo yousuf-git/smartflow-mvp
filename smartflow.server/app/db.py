@@ -51,7 +51,7 @@ def init_engine(settings: Settings) -> AsyncEngine:
     if not settings.DATABASE_URL:
         raise RuntimeError("DATABASE_URL is not set")
     _engine = create_async_engine(
-        settings.DATABASE_URL,
+        settings.async_database_url,
         echo=False,
         pool_pre_ping=True,
     )
