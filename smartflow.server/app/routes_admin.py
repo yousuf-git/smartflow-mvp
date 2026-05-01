@@ -1033,7 +1033,7 @@ async def list_orders(
     for g in groups:
         user = await session.get(User, g.user_id)
         plant = await session.get(Plant, g.plant_id)
-        total_litres = float(sum(p.litres_count for p in g.purchases))
+        total_litres = float(sum(p.litres_delivered for p in g.purchases))
         total_price = 0.0
         unit_price = None
         daily_litre_limit = None
@@ -1041,7 +1041,7 @@ async def list_orders(
             pr = await session.get(Price, p.price_id)
             if pr:
                 unit_price = unit_price if unit_price is not None else float(pr.unit_price)
-                total_price += float((p.litres_count * pr.unit_price).quantize(Decimal("0.01")))
+                total_price += float((p.litres_delivered * pr.unit_price).quantize(Decimal("0.01")))
             limit = await session.get(Limit, p.limit_id)
             if limit and daily_litre_limit is None:
                 daily_litre_limit = float(limit.daily_litre_limit)
