@@ -66,9 +66,13 @@ class MQTTClient:
 
     async def start(self) -> None:
         """Starts the MQTT background loop task."""
-        import traceback
-        caller = "".join(traceback.format_stack(limit=3)).strip()
-        logger.info("mqtt.start called from:\n%s", caller)
+        import sys, traceback
+        mqtt_modules = [k for k in sys.modules if "mqtt" in k.lower()]
+        caller = "".join(traceback.format_stack(limit=5)).strip()
+        logger.info(
+            "mqtt.start self=%d modules=%s\n%s",
+            id(self), mqtt_modules, caller,
+        )
         if not self._settings.mqtt_configured:
             logger.warning("mqtt.disabled reason=not-configured")
             return
