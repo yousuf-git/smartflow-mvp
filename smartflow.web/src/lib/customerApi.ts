@@ -52,6 +52,19 @@ export type CustomerTransaction = {
   purchase_id: number | null;
 };
 
+export type CustomerCaneDetail = {
+  id: number;
+  tap_label: string;
+  cane_number: number;
+  litres_requested: number;
+  litres_delivered: number;
+  price: number;
+  status: string;
+  reason: string | null;
+  started_at: string | null;
+  completed_at: string | null;
+};
+
 export type CustomerPurchase = {
   id: string;
   plant_name: string;
@@ -60,6 +73,7 @@ export type CustomerPurchase = {
   total_price: number;
   cane_count: number;
   created_at: string;
+  canes: CustomerCaneDetail[];
 };
 
 export type TopUpMethod = "Jazzcash" | "Easypaisa";

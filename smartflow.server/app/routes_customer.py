@@ -46,6 +46,7 @@ from app.models import (
 )
 from app.schemas import (
     AuthUser,
+    CustomerCaneDetailOut,
     CustomerDashboardOut,
     CustomerPlantOut,
     CustomerProfileUpdateIn,
@@ -171,12 +172,27 @@ async def customer_purchases(
     result = []
     for g in groups:
         plant = await session.get(Plant, g.plant_id)
-        total_litres = float(sum(p.litres_count for p in g.purchases))
+        total_litres = float(sum(p.litres_delivered for p in g.purchases))
         total_price = 0.0
+        cane_details: list[CustomerCaneDetailOut] = []
         for p in g.purchases:
             pr = await session.get(Price, p.price_id)
-            if pr:
-                total_price += float((p.litres_count * pr.unit_price).quantize(Decimal("0.01")))
+            unit = pr.unit_price if pr else Decimal("0")
+            cane_price = float((p.litres_delivered * unit).quantize(Decimal("0.01")))
+            total_price += cane_price
+            tap = await session.get(Tap, p.tap_id)
+            cane_details.append(CustomerCaneDetailOut(
+                id=p.id,
+                tap_label=tap.label if tap else f"Tap {p.tap_id}",
+                cane_number=p.cane_number,
+                litres_requested=float(p.litres_count),
+                litres_delivered=float(p.litres_delivered),
+                price=cane_price,
+                status=p.status.value,
+                reason=p.reason,
+                started_at=p.started_at,
+                completed_at=p.completed_at,
+            ))
         result.append(CustomerPurchaseOut(
             id=str(g.id),
             plant_name=plant.name if plant else "",
@@ -185,6 +201,7 @@ async def customer_purchases(
             total_price=total_price,
             cane_count=len(g.purchases),
             created_at=g.created_at,
+            canes=cane_details,
         ))
     return result
 

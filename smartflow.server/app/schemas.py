@@ -533,8 +533,22 @@ class CustomerPlantOut(BaseModel):
     operating_hours: list[OperatingHourOut]
 
 
+class CustomerCaneDetailOut(BaseModel):
+    """Per-cane detail in purchase history."""
+    id: int
+    tap_label: str
+    cane_number: int
+    litres_requested: float
+    litres_delivered: float
+    price: float
+    status: str
+    reason: Optional[str] = None
+    started_at: Optional[datetime] = None
+    completed_at: Optional[datetime] = None
+
+
 class CustomerPurchaseOut(BaseModel):
-    """Summary of a past purchase for the customer transaction history."""
+    """Detailed purchase history for the customer transaction tab."""
     id: str
     plant_name: str
     status: str
@@ -542,6 +556,7 @@ class CustomerPurchaseOut(BaseModel):
     total_price: float
     cane_count: int
     created_at: datetime
+    canes: list[CustomerCaneDetailOut] = []
 
 
 class CustomerTopUpIn(BaseModel):
