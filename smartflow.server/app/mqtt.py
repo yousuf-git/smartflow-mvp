@@ -121,9 +121,8 @@ class MQTTClient:
                     port=s.AWS_IOT_PORT,
                     identifier=s.AWS_IOT_CLIENT_ID,
                     tls_context=ssl_ctx,
-                    keepalive=1200,
+                    keepalive=30,
                 )
-                mqtt_client._client.reconnect_on_failure = False
                 async with mqtt_client as client:
                     self._client = client
                     connected_at = loop.time()
