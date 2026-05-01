@@ -70,6 +70,7 @@ async def lifespan(app: FastAPI):
     global _start_time, _start_dt, _mqtt_ref
     settings = get_settings()
     _configure_logging(settings.LOG_LEVEL)
+    settings.materialize_certs()
     init_engine(settings)
     await init_schema_and_seed(settings)
     mqtt = init_mqtt_client(settings)

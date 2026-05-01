@@ -13,7 +13,10 @@ Connections:
 - Used by: Almost every module in the application to access runtime constants.
 """
 
+import base64
+import tempfile
 from functools import lru_cache
+from pathlib import Path
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -40,6 +43,9 @@ class Settings(BaseSettings):
     AWS_IOT_CA_PATH: str = ""
     AWS_IOT_CERT_PATH: str = ""
     AWS_IOT_KEY_PATH: str = ""
+    AWS_IOT_CA_B64: str = ""
+    AWS_IOT_CERT_B64: str = ""
+    AWS_IOT_KEY_B64: str = ""
 
     # Database Connection String (e.g., postgresql+asyncpg://user:pass@host/db)
     DATABASE_URL: str = ""
@@ -109,6 +115,26 @@ class Settings(BaseSettings):
         Used by app.main to configure CORSMiddleware.
         """
         return [o.strip() for o in self.CORS_ORIGINS.split(",") if o.strip()]
+
+    def materialize_certs(self) -> None:
+        """Decode base64 cert env vars to temp files if paths not already set."""
+        if self.AWS_IOT_CA_PATH and Path(self.AWS_IOT_CA_PATH).exists():
+            return
+        pairs = [
+            ("AWS_IOT_CA_B64", "AWS_IOT_CA_PATH", "ca.pem"),
+            ("AWS_IOT_CERT_B64", "AWS_IOT_CERT_PATH", "cert.pem"),
+            ("AWS_IOT_KEY_B64", "AWS_IOT_KEY_PATH", "key.pem"),
+        ]
+        for b64_attr, path_attr, filename in pairs:
+            b64_val = getattr(self, b64_attr)
+            if not b64_val:
+                continue
+            cert_dir = Path(tempfile.gettempdir()) / "smartflow-certs"
+            cert_dir.mkdir(exist_ok=True)
+            cert_file = cert_dir / filename
+            cert_file.write_bytes(base64.b64decode(b64_val))
+            cert_file.chmod(0o600)
+            object.__setattr__(self, path_attr, str(cert_file))
 
     @property
     def mqtt_configured(self) -> bool:
