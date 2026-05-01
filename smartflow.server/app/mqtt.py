@@ -109,10 +109,8 @@ class MQTTClient:
         while True:
             connected_at = loop.time()
             try:
-                ssl_ctx = ssl.SSLContext(ssl.PROTOCOL_TLSv1_2)
-                ssl_ctx.load_verify_locations(s.AWS_IOT_CA_PATH)
+                ssl_ctx = ssl.create_default_context(cafile=s.AWS_IOT_CA_PATH)
                 ssl_ctx.load_cert_chain(s.AWS_IOT_CERT_PATH, s.AWS_IOT_KEY_PATH)
-                ssl_ctx.verify_mode = ssl.CERT_REQUIRED
                 if s.AWS_IOT_PORT == 443:
                     ssl_ctx.set_alpn_protocols(["x-amzn-mqtt-ca"])
                 async with aiomqtt.Client(
@@ -121,18 +119,20 @@ class MQTTClient:
                     identifier=s.AWS_IOT_CLIENT_ID,
                     tls_context=ssl_ctx,
                     keepalive=60,
+                    timeout=30,
                 ) as client:
                     self._client = client
                     connected_at = loop.time()
 
-                    await client.subscribe(ack_topic(s.CONTROLLER_NAME), qos=1)
-                    await client.subscribe(progress_topic(s.CONTROLLER_NAME), qos=1)
+                    ack = ack_topic(s.CONTROLLER_NAME)
+                    prg = progress_topic(s.CONTROLLER_NAME)
+                    await client.subscribe(ack, qos=1)
+                    await client.subscribe(prg, qos=1)
 
                     self._ready.set()
                     logger.info(
-                        "mqtt.connected endpoint=%s controller=%s",
-                        s.AWS_IOT_ENDPOINT,
-                        s.CONTROLLER_NAME,
+                        "mqtt.connected endpoint=%s port=%s controller=%s",
+                        s.AWS_IOT_ENDPOINT, s.AWS_IOT_PORT, s.CONTROLLER_NAME,
                     )
 
                     async for message in client.messages:
