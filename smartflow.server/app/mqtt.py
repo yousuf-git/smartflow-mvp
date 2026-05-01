@@ -130,9 +130,10 @@ class MQTTClient:
                     connected_at = loop.time()
 
                     self._ready.set()
+                    tid = id(asyncio.current_task())
                     logger.info(
-                        "mqtt.connected endpoint=%s port=%s controller=%s",
-                        s.AWS_IOT_ENDPOINT, s.AWS_IOT_PORT, s.CONTROLLER_NAME,
+                        "mqtt.connected tid=%d endpoint=%s port=%s",
+                        tid, s.AWS_IOT_ENDPOINT, s.AWS_IOT_PORT,
                     )
 
                     ack = ack_topic(s.CONTROLLER_NAME)
@@ -167,8 +168,10 @@ class MQTTClient:
                     except Exception:
                         pass
 
-            logger.info("mqtt.reconnecting in=%.1fs", backoff)
+            tid = id(asyncio.current_task())
+            logger.info("mqtt.sleep tid=%d backoff=%.1fs", tid, backoff)
             await asyncio.sleep(backoff)
+            logger.info("mqtt.woke tid=%d", tid)
             backoff = min(backoff * 2, 60.0)
 
     async def _dispatch(self, topic: str, raw: bytes) -> None:
