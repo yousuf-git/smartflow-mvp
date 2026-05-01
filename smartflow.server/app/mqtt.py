@@ -116,14 +116,15 @@ class MQTTClient:
                 ssl_ctx.load_cert_chain(s.AWS_IOT_CERT_PATH, s.AWS_IOT_KEY_PATH)
                 if s.AWS_IOT_PORT == 443:
                     ssl_ctx.set_alpn_protocols(["x-amzn-mqtt-ca"])
-                async with aiomqtt.Client(
+                mqtt_client = aiomqtt.Client(
                     hostname=s.AWS_IOT_ENDPOINT,
                     port=s.AWS_IOT_PORT,
                     identifier=s.AWS_IOT_CLIENT_ID,
                     tls_context=ssl_ctx,
                     keepalive=1200,
-                ) as client:
-                    client._client.reconnect_on_failure = False
+                )
+                mqtt_client._client.reconnect_on_failure = False
+                async with mqtt_client as client:
                     self._client = client
                     connected_at = loop.time()
 
