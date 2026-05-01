@@ -262,12 +262,7 @@ class MQTTClient:
                         p.status in purchase_service.TERMINAL_STATUSES for p in group.purchases
                     )
                     if all_terminal:
-                        from app.models import PurchaseGroupStatus
-                        any_started = any(
-                            p.status in (PurchaseStatus.completed, PurchaseStatus.partial_completed, PurchaseStatus.failed)
-                            for p in group.purchases
-                        )
-                        group.status = PurchaseGroupStatus.completed if any_started else PurchaseGroupStatus.cancelled
+                        group.status = purchase_service.resolve_group_status(list(group.purchases))
                         await session.commit()
                         registry.cancel_idle(cane.group_id)
                         await registry.close_group(cane.group_id)

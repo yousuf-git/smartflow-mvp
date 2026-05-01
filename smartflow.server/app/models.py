@@ -254,6 +254,7 @@ class Tap(Base):
 class PurchaseGroupStatus(str, enum.Enum):
     active = "active"
     completed = "completed"
+    partial_completed = "partial_completed"
     cancelled = "cancelled"
 
 

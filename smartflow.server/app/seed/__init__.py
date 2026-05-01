@@ -49,6 +49,18 @@ async def init_schema_and_seed(settings: Settings) -> None:
         await conn.execute(text("ALTER TABLE prices ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ DEFAULT now()"))
         await conn.execute(text("ALTER TABLE limits ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ DEFAULT now()"))
         await conn.execute(text("ALTER TABLE limits ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ DEFAULT now()"))
+        await conn.execute(text("""
+            DO $$
+            BEGIN
+                IF NOT EXISTS (
+                    SELECT 1 FROM pg_enum
+                    WHERE enumlabel = 'partial_completed'
+                    AND enumtypid = 'purchase_group_status'::regtype
+                ) THEN
+                    ALTER TYPE purchase_group_status ADD VALUE 'partial_completed';
+                END IF;
+            END$$;
+        """))
     logger.info("db.schema.ready")
 
     sm = get_sessionmaker()

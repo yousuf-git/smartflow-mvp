@@ -380,28 +380,35 @@ async def cancel_pending_canes(
         c.status in (PurchaseStatus.pending, PurchaseStatus.started) for c in canes
     )
     if not remaining_active:
-        any_started = any(
-            c.status
-            in (
-                PurchaseStatus.completed,
-                PurchaseStatus.partial_completed,
-                PurchaseStatus.failed,
-            )
-            for c in canes
-        )
-        group.status = (
-            PurchaseGroupStatus.completed if any_started else PurchaseGroupStatus.cancelled
-        )
+        group.status = resolve_group_status(list(canes))
     return group, cancelled
 
 
-# List of statuses where a cane is no longer active
 TERMINAL_STATUSES = (
     PurchaseStatus.completed,
     PurchaseStatus.partial_completed,
     PurchaseStatus.failed,
     PurchaseStatus.cancelled,
 )
+
+DELIVERED_STATUSES = (
+    PurchaseStatus.completed,
+    PurchaseStatus.partial_completed,
+    PurchaseStatus.failed,
+)
+
+
+def resolve_group_status(canes: list[Purchase]) -> PurchaseGroupStatus:
+    """Determine group status from its canes when all are terminal."""
+    has_completed = any(c.status == PurchaseStatus.completed for c in canes)
+    has_delivered = any(c.status in DELIVERED_STATUSES for c in canes)
+    all_completed = all(c.status == PurchaseStatus.completed for c in canes)
+
+    if not has_delivered:
+        return PurchaseGroupStatus.cancelled
+    if all_completed:
+        return PurchaseGroupStatus.completed
+    return PurchaseGroupStatus.partial_completed
 
 
 async def apply_progress(
@@ -481,8 +488,7 @@ async def apply_progress(
         if not has_other_active:
             tap.is_available = True
 
-    # Complete the group if all canes are terminal
     group = await load_group(session, cane.group_id)
     if group is not None and all(p.status in TERMINAL_STATUSES for p in group.purchases):
-        group.status = PurchaseGroupStatus.completed
+        group.status = resolve_group_status(list(group.purchases))
     return cane

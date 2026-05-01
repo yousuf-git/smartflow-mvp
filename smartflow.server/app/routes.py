@@ -213,10 +213,7 @@ def _arm_idle_for_tap(group_id: uuid.UUID, tap_id: int, settings: Settings) -> N
                         "reason": cane.reason,
                     },
                 )
-        if group.status in (
-            purchase_service.PurchaseGroupStatus.completed,
-            purchase_service.PurchaseGroupStatus.cancelled,
-        ):
+        if group.status != purchase_service.PurchaseGroupStatus.active:
             await registry.close_group(gid)
 
     registry.arm_idle_for_tap(group_id, tap_id, settings.IDLE_RELEASE_SECONDS, _fire)
@@ -406,11 +403,7 @@ async def stop_cane(
             p.status in purchase_service.TERMINAL_STATUSES for p in group.purchases
         )
         if all_terminal:
-            any_started = any(
-                p.status in (PurchaseStatus.completed, PurchaseStatus.partial_completed, PurchaseStatus.failed)
-                for p in group.purchases
-            )
-            group.status = purchase_service.PurchaseGroupStatus.completed if any_started else purchase_service.PurchaseGroupStatus.cancelled
+            group.status = purchase_service.resolve_group_status(list(group.purchases))
             await session.commit()
             registry.cancel_idle(cane.group_id)
             await registry.close_group(cane.group_id)
