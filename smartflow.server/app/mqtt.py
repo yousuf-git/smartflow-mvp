@@ -129,16 +129,24 @@ class MQTTClient:
                     self._client = client
                     connected_at = loop.time()
 
-                    ack = ack_topic(s.CONTROLLER_NAME)
-                    prg = progress_topic(s.CONTROLLER_NAME)
-                    await client.subscribe(ack, qos=1)
-                    await client.subscribe(prg, qos=1)
-
                     self._ready.set()
                     logger.info(
                         "mqtt.connected endpoint=%s port=%s controller=%s",
                         s.AWS_IOT_ENDPOINT, s.AWS_IOT_PORT, s.CONTROLLER_NAME,
                     )
+
+                    ack = ack_topic(s.CONTROLLER_NAME)
+                    prg = progress_topic(s.CONTROLLER_NAME)
+                    try:
+                        await client.subscribe(ack, qos=1)
+                        logger.info("mqtt.subscribed topic=%s", ack)
+                    except Exception as sub_exc:
+                        logger.error("mqtt.subscribe.failed topic=%s err=%r", ack, sub_exc)
+                    try:
+                        await client.subscribe(prg, qos=1)
+                        logger.info("mqtt.subscribed topic=%s", prg)
+                    except Exception as sub_exc:
+                        logger.error("mqtt.subscribe.failed topic=%s err=%r", prg, sub_exc)
 
                     async for message in client.messages:
                         await self._dispatch(str(message.topic), message.payload)
