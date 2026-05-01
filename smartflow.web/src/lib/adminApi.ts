@@ -73,6 +73,19 @@ export type AdminCustomer = {
   daily_consumed: number;
 };
 
+export type AdminOrderCane = {
+  id: number;
+  tap_label: string;
+  cane_number: number;
+  litres_requested: number;
+  litres_delivered: number;
+  price: number;
+  status: string;
+  reason: string | null;
+  started_at: string | null;
+  completed_at: string | null;
+};
+
 export type AdminOrder = {
   id: string;
   user_email: string;
@@ -84,6 +97,7 @@ export type AdminOrder = {
   daily_litre_limit?: number | null;
   cane_count: number;
   created_at: string;
+  canes: AdminOrderCane[];
 };
 
 export type AdminPlantTap = {

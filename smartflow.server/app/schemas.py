@@ -104,7 +104,7 @@ class OrderOut(BaseModel):
     """Detailed summary of an entire purchase group (order)."""
     id: str  # UUID as string
     plant_id: int
-    status: Literal["active", "completed", "cancelled"]
+    status: Literal["active", "completed", "partial_completed", "cancelled"]
     total_litres: float
     total_price: float
     canes: list[CaneOut]
@@ -233,6 +233,20 @@ class CustomerListOut(BaseModel):
     daily_consumed: float
 
 
+class OrderCaneOut(BaseModel):
+    """Per-cane detail for admin/manager order listings."""
+    id: int
+    tap_label: str
+    cane_number: int
+    litres_requested: float
+    litres_delivered: float
+    price: float
+    status: str
+    reason: Optional[str] = None
+    started_at: Optional[datetime] = None
+    completed_at: Optional[datetime] = None
+
+
 class OrderListOut(BaseModel):
     """Summary of an order for administrative listings."""
     id: str
@@ -245,6 +259,7 @@ class OrderListOut(BaseModel):
     daily_litre_limit: Optional[float] = None
     cane_count: int
     created_at: datetime
+    canes: list[OrderCaneOut] = []
 
 
 class ControllerOut(BaseModel):

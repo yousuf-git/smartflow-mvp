@@ -57,6 +57,7 @@ from app.schemas import (
     OperatingHourCreateIn,
     OperatingHourOut,
     OperatingHourUpdateIn,
+    OrderCaneOut,
     OrderListOut,
     PlantDetailOut,
     ProfileUpdateIn,
@@ -445,14 +446,30 @@ async def manager_orders(
         total_price = 0.0
         unit_price = None
         daily_litre_limit = None
+        cane_details = []
         for p in g.purchases:
             pr = await session.get(Price, p.price_id)
-            if pr:
-                unit_price = unit_price if unit_price is not None else float(pr.unit_price)
-                total_price += float((p.litres_delivered * pr.unit_price).quantize(Decimal("0.01")))
+            unit = pr.unit_price if pr else Decimal("0")
+            if pr and unit_price is None:
+                unit_price = float(pr.unit_price)
+            cane_price = float((p.litres_delivered * unit).quantize(Decimal("0.01")))
+            total_price += cane_price
             limit = await session.get(Limit, p.limit_id)
             if limit and daily_litre_limit is None:
                 daily_litre_limit = float(limit.daily_litre_limit)
+            tap = await session.get(Tap, p.tap_id)
+            cane_details.append(OrderCaneOut(
+                id=p.id,
+                tap_label=tap.label if tap else f"Tap {p.tap_id}",
+                cane_number=p.cane_number,
+                litres_requested=float(p.litres_count),
+                litres_delivered=float(p.litres_delivered),
+                price=cane_price,
+                status=p.status.value,
+                reason=p.reason,
+                started_at=p.started_at,
+                completed_at=p.completed_at,
+            ))
         result.append(OrderListOut(
             id=str(g.id),
             user_email=u.email if u else "",
@@ -464,6 +481,7 @@ async def manager_orders(
             daily_litre_limit=daily_litre_limit,
             cane_count=len(g.purchases),
             created_at=g.created_at,
+            canes=cane_details,
         ))
     return result
 

@@ -44,9 +44,10 @@ const CANE_STATUS_MAP: Record<string, { label: string; color: string; bg: string
 };
 
 const GROUP_STATUS_MAP: Record<string, { label: string; color: string; bg: string }> = {
-  completed: { label: "Completed", color: "#059669", bg: "#ecfdf5" },
-  active:    { label: "Active",    color: "#2563eb", bg: "#eff6ff" },
-  cancelled: { label: "Cancelled", color: "#64748b", bg: "#f1f5f9" },
+  completed:         { label: "Completed", color: "#059669", bg: "#ecfdf5" },
+  partial_completed: { label: "Partial",   color: "#d97706", bg: "#fffbeb" },
+  active:            { label: "Active",    color: "#2563eb", bg: "#eff6ff" },
+  cancelled:         { label: "Cancelled", color: "#64748b", bg: "#f1f5f9" },
 };
 
 function caneChip(status: string) {
@@ -63,11 +64,29 @@ function groupChip(status: string) {
   );
 }
 
+function fmtTime(iso: string) {
+  return new Date(iso).toLocaleString("en-PK", {
+    dateStyle: "medium",
+    timeStyle: "short",
+    hour12: true,
+  });
+}
+
+function groupByTap(canes: CustomerCaneDetail[]) {
+  const map = new Map<string, CustomerCaneDetail[]>();
+  for (const c of canes) {
+    const key = c.tap_label;
+    if (!map.has(key)) map.set(key, []);
+    map.get(key)!.push(c);
+  }
+  return map;
+}
+
 function CaneRow({ cane }: { cane: CustomerCaneDetail }) {
   return (
-    <div className="flex items-center justify-between py-1.5 text-xs border-t border-slate-50">
+    <div className="flex items-center justify-between py-1.5 text-xs border-t border-slate-100">
       <div className="flex items-center gap-2 min-w-0">
-        <span className="text-slate-500 shrink-0">{cane.tap_label} #{cane.cane_number}</span>
+        <span className="text-slate-500 shrink-0">#{cane.cane_number}</span>
         {caneChip(cane.status)}
       </div>
       <div className="flex items-center gap-3 text-right shrink-0">
@@ -84,6 +103,7 @@ function CaneRow({ cane }: { cane: CustomerCaneDetail }) {
 
 function PurchaseCard({ p }: { p: CustomerPurchase }) {
   const [open, setOpen] = useState(false);
+  const byTap = groupByTap(p.canes);
   return (
     <Paper
       elevation={0}
@@ -113,7 +133,7 @@ function PurchaseCard({ p }: { p: CustomerPurchase }) {
         </div>
         <div className="flex flex-col items-end gap-1 shrink-0 ml-3">
           <span className="text-[11px] text-slate-400">
-            {new Date(p.created_at).toLocaleString()}
+            {fmtTime(p.created_at)}
           </span>
           {open ? (
             <ChevronUp className="w-4 h-4 text-slate-400" />
@@ -123,9 +143,16 @@ function PurchaseCard({ p }: { p: CustomerPurchase }) {
         </div>
       </button>
       {open && (
-        <div className="px-3 pb-2.5 pt-0">
-          {p.canes.map((c) => (
-            <CaneRow key={c.id} cane={c} />
+        <div className="px-3 pb-2.5 pt-0 space-y-2">
+          {[...byTap.entries()].map(([tapLabel, canes]) => (
+            <div key={tapLabel}>
+              <Typography variant="caption" sx={{ fontWeight: 600, color: "text.secondary" }}>
+                {tapLabel}
+              </Typography>
+              {canes.map((c) => (
+                <CaneRow key={c.id} cane={c} />
+              ))}
+            </div>
           ))}
         </div>
       )}
@@ -236,7 +263,7 @@ export default function CustomerTransactions() {
                       {tx.purchase_id ? ` #${tx.purchase_id}` : ""}
                     </p>
                     <p className="text-xs text-slate-400">
-                      {new Date(tx.timestamp).toLocaleString()}
+                      {fmtTime(tx.timestamp)}
                     </p>
                   </div>
                 </div>

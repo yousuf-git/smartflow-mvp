@@ -1,6 +1,6 @@
 import { api } from "./api";
-import type { AdminOrder, AdminCustomer, AdminPlant, OperatingHour } from "./adminApi";
-export type { AdminPlant, AdminOrder, AdminCustomer, OperatingHour };
+import type { AdminOrder, AdminOrderCane, AdminCustomer, AdminPlant, OperatingHour } from "./adminApi";
+export type { AdminPlant, AdminOrder, AdminOrderCane, AdminCustomer, OperatingHour };
 
 export type ManagerDashboard = {
   plant_name: string;
