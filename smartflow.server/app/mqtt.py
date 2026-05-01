@@ -118,8 +118,7 @@ class MQTTClient:
                     port=s.AWS_IOT_PORT,
                     identifier=s.AWS_IOT_CLIENT_ID,
                     tls_context=ssl_ctx,
-                    keepalive=60,
-                    timeout=30,
+                    keepalive=1200,
                 ) as client:
                     self._client = client
                     connected_at = loop.time()
