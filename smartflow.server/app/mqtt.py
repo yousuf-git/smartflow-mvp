@@ -66,21 +66,13 @@ class MQTTClient:
 
     async def start(self) -> None:
         """Starts the MQTT background loop task."""
-        import sys, traceback
-        mqtt_modules = [k for k in sys.modules if "mqtt" in k.lower()]
-        caller = "".join(traceback.format_stack(limit=5)).strip()
-        logger.info(
-            "mqtt.start self=%d modules=%s\n%s",
-            id(self), mqtt_modules, caller,
-        )
         if not self._settings.mqtt_configured:
             logger.warning("mqtt.disabled reason=not-configured")
             return
         if self._task and not self._task.done():
-            logger.warning("mqtt.start.already-running task=%s", id(self._task))
+            logger.warning("mqtt.start.already-running")
             return
         self._task = asyncio.create_task(self._run(), name="mqtt-loop")
-        logger.info("mqtt.start.created task=%s", id(self._task))
 
     async def stop(self) -> None:
         """Gracefully stops the MQTT client and cancels the loop task."""
@@ -119,7 +111,6 @@ class MQTTClient:
         loop = asyncio.get_event_loop()
         while True:
             connected_at = loop.time()
-            paho_client = None
             try:
                 ssl_ctx = ssl.create_default_context(cafile=s.AWS_IOT_CA_PATH)
                 ssl_ctx.load_cert_chain(s.AWS_IOT_CERT_PATH, s.AWS_IOT_KEY_PATH)
@@ -132,30 +123,20 @@ class MQTTClient:
                     tls_context=ssl_ctx,
                     keepalive=30,
                 )
-                paho_client = mqtt_client._client
                 async with mqtt_client as client:
                     self._client = client
                     connected_at = loop.time()
 
-                    self._ready.set()
-                    tid = id(asyncio.current_task())
-                    logger.info(
-                        "mqtt.connected tid=%d endpoint=%s port=%s",
-                        tid, s.AWS_IOT_ENDPOINT, s.AWS_IOT_PORT,
-                    )
-
                     ack = ack_topic(s.CONTROLLER_NAME)
                     prg = progress_topic(s.CONTROLLER_NAME)
-                    try:
-                        await client.subscribe(ack, qos=1)
-                        logger.info("mqtt.subscribed topic=%s", ack)
-                    except Exception as sub_exc:
-                        logger.error("mqtt.subscribe.failed topic=%s err=%r", ack, sub_exc)
-                    try:
-                        await client.subscribe(prg, qos=1)
-                        logger.info("mqtt.subscribed topic=%s", prg)
-                    except Exception as sub_exc:
-                        logger.error("mqtt.subscribe.failed topic=%s err=%r", prg, sub_exc)
+                    await client.subscribe(ack, qos=1)
+                    await client.subscribe(prg, qos=1)
+
+                    self._ready.set()
+                    logger.info(
+                        "mqtt.connected endpoint=%s port=%s controller=%s",
+                        s.AWS_IOT_ENDPOINT, s.AWS_IOT_PORT, s.CONTROLLER_NAME,
+                    )
 
                     async for message in client.messages:
                         await self._dispatch(str(message.topic), message.payload)
@@ -170,16 +151,9 @@ class MQTTClient:
             finally:
                 self._client = None
                 self._ready.clear()
-                if paho_client is not None:
-                    try:
-                        paho_client.disconnect()
-                    except Exception:
-                        pass
 
-            tid = id(asyncio.current_task())
-            logger.info("mqtt.sleep tid=%d backoff=%.1fs", tid, backoff)
+            logger.info("mqtt.reconnecting in=%.1fs", backoff)
             await asyncio.sleep(backoff)
-            logger.info("mqtt.woke tid=%d", tid)
             backoff = min(backoff * 2, 60.0)
 
     async def _dispatch(self, topic: str, raw: bytes) -> None:
@@ -303,6 +277,5 @@ def get_mqtt_client() -> MQTTClient:
 def init_mqtt_client(settings: Settings) -> MQTTClient:
     """Initializes the global MQTT client singleton."""
     global _mqtt_client
-    logger.info("mqtt.init called, existing=%s", _mqtt_client is not None)
     _mqtt_client = MQTTClient(settings)
     return _mqtt_client
