@@ -1,5 +1,0 @@
-{
-    "buildCommand": "cd smartflow.web && npm install && npm run build",
-    "outputDirectory": "smartflow.web/dist",
-    "framework": "vite"
-  }
