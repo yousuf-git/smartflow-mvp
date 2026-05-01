@@ -93,7 +93,7 @@ class Settings(BaseSettings):
     INITIAL_BALANCE: float = 500.0
 
     # Business Logic Constants / Constraints
-    ACK_TIMEOUT_SECONDS: float = 5.0    # Wait time for device to acknowledge a START command
+    ACK_TIMEOUT_SECONDS: float = 15.0   # Wait time for device to acknowledge a START command
     MAX_LITRES: float = 100.0           # Maximum allowed per cane dispense
     IDLE_RELEASE_SECONDS: float = 90.0  # Duration before an inactive order WS is closed
     RETRY_LIMIT: int = 3                # Max retries for starting a dispense
