@@ -7,7 +7,7 @@ import type { Cane, Order, Plant } from "../lib/api";
 type Props = {
   order: Order;
   plant: Plant;
-  idleDeadline: number | null;
+  idleDeadlines: Record<number, number>;
   startingCaneId: number | null;
   onStart: (caneId: number) => void;
   onStop: (caneId: number) => void;
@@ -25,7 +25,7 @@ const terminal = new Set<Cane["status"]>([
 export default function ProgressScreen({
   order,
   plant,
-  idleDeadline,
+  idleDeadlines,
   startingCaneId,
   onStart,
   onStop,
@@ -86,7 +86,11 @@ export default function ProgressScreen({
           </div>
 
           <div className="flex flex-col items-end gap-2">
-            {hasPending && <IdleTimer deadline={idleDeadline} />}
+            {hasPending && Object.keys(idleDeadlines).length > 0 && (
+              <IdleTimer
+                deadline={Math.min(...Object.values(idleDeadlines))}
+              />
+            )}
 
             {allTerminal ? (
               <Button
@@ -119,19 +123,46 @@ export default function ProgressScreen({
         </div>
       </Paper>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-        {order.canes.map((cane) => {
-          const tapBusy = !!activeByTap[cane.tap_id] && cane.status === "pending";
+      <div className="flex flex-col gap-4">
+        {Object.entries(
+          order.canes.reduce<Record<number, typeof order.canes>>(
+            (acc, c) => {
+              (acc[c.tap_id] ??= []).push(c);
+              return acc;
+            },
+            {},
+          ),
+        ).map(([tapIdStr, canes]) => {
+          const tapId = Number(tapIdStr);
+          const tapDeadline = idleDeadlines[tapId] ?? null;
+          const tapHasPending = canes.some((c) => c.status === "pending");
           return (
-            <CaneCard
-              key={cane.id}
-              cane={cane}
-              tapLabel={tapLabel(cane.tap_id)}
-              canStart={!tapBusy}
-              startPending={startingCaneId === cane.id}
-              onStart={() => onStart(cane.id)}
-              onStop={() => onStop(cane.id)}
-            />
+            <div key={tapId}>
+              <div className="flex items-center justify-between mb-2">
+                <Typography variant="subtitle2" sx={{ fontWeight: 600, color: "text.secondary" }}>
+                  {tapLabel(tapId)}
+                </Typography>
+                {tapHasPending && tapDeadline !== null && (
+                  <IdleTimer deadline={tapDeadline} />
+                )}
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                {canes.map((cane) => {
+                  const tapBusy = !!activeByTap[cane.tap_id] && cane.status === "pending";
+                  return (
+                    <CaneCard
+                      key={cane.id}
+                      cane={cane}
+                      tapLabel={tapLabel(cane.tap_id)}
+                      canStart={!tapBusy}
+                      startPending={startingCaneId === cane.id}
+                      onStart={() => onStart(cane.id)}
+                      onStop={() => onStop(cane.id)}
+                    />
+                  );
+                })}
+              </div>
+            </div>
           );
         })}
       </div>
@@ -139,23 +170,21 @@ export default function ProgressScreen({
   );
 }
 
-function IdleTimer({ deadline }: { deadline: number | null }) {
+function IdleTimer({ deadline }: { deadline: number }) {
   const [now, setNow] = useState(() => Date.now());
   const ref = useRef<number | null>(null);
   useEffect(() => {
-    if (deadline === null) return;
     ref.current = window.setInterval(() => setNow(Date.now()), 1000);
     return () => {
       if (ref.current) window.clearInterval(ref.current);
     };
   }, [deadline]);
-  if (deadline === null) return null;
   const secs = Math.max(0, Math.round((deadline - now) / 1000));
   const mm = Math.floor(secs / 60).toString().padStart(2, "0");
   const ss = (secs % 60).toString().padStart(2, "0");
   return (
     <Chip
-      label={`Pending canes release in ${mm}:${ss}`}
+      label={`Pending release in ${mm}:${ss}`}
       size="small"
       sx={{ bgcolor: "#EEFAFD", color: "#074E66", fontWeight: 600 }}
     />

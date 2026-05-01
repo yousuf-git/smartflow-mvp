@@ -35,18 +35,18 @@ class CaneRuntime:
 class GroupRuntime:
     """
     Runtime state for an entire order (PurchaseGroup).
-    
+
     Attributes:
         group_id: Unique identifier for the order.
         canes: Map of cane_id to its runtime state.
         ws_queue: Queue for pushing real-time frames to the client's WebSocket.
-        idle_task: Background task that monitors for order inactivity.
+        idle_tasks: Per-tap background tasks that monitor for tap inactivity.
         closed: Flag indicating if the runtime session is finished.
     """
     group_id: uuid.UUID
     canes: dict[int, CaneRuntime] = field(default_factory=dict)
     ws_queue: asyncio.Queue[dict[str, Any]] = field(default_factory=asyncio.Queue)
-    idle_task: asyncio.Task[None] | None = None
+    idle_tasks: dict[int, asyncio.Task[None]] = field(default_factory=dict)
     closed: bool = False
 
 
@@ -151,47 +151,61 @@ class Registry:
             rt.closed = True
             for cid in list(rt.canes.keys()):
                 self._cane_index.pop(cid, None)
-            if rt.idle_task and not rt.idle_task.done():
-                rt.idle_task.cancel()
-            
-            # Special frame to signal WebSocket closure
+            for task in rt.idle_tasks.values():
+                if not task.done():
+                    task.cancel()
+            rt.idle_tasks.clear()
+
             await rt.ws_queue.put({"__close__": True})
             logger.info("runtime.close group=%s", group_id)
 
-    def arm_idle(
+    def arm_idle_for_tap(
         self,
         group_id: uuid.UUID,
+        tap_id: int,
         delay: float,
-        on_fire: Callable[[uuid.UUID], Awaitable[None]],
+        on_fire: Callable[[uuid.UUID, int], Awaitable[None]],
     ) -> None:
         """
-        Sets a countdown timer for order inactivity. 
-        If it reaches zero, the `on_fire` callback is executed.
+        Sets a per-tap countdown timer for inactivity.
+        If it reaches zero, `on_fire(group_id, tap_id)` is called.
         """
         rt = self._groups.get(group_id)
         if rt is None:
             return
-        if rt.idle_task and not rt.idle_task.done():
-            rt.idle_task.cancel()
+        existing = rt.idle_tasks.get(tap_id)
+        if existing and not existing.done():
+            existing.cancel()
 
         async def _run() -> None:
             try:
                 await asyncio.sleep(delay)
-                await on_fire(group_id)
+                await on_fire(group_id, tap_id)
             except asyncio.CancelledError:
                 return
             except Exception as exc:
-                logger.exception("runtime.idle.error group=%s err=%s", group_id, exc)
+                logger.exception("runtime.idle.error group=%s tap=%s err=%s", group_id, tap_id, exc)
 
-        rt.idle_task = asyncio.create_task(_run(), name=f"idle-{group_id}")
+        rt.idle_tasks[tap_id] = asyncio.create_task(_run(), name=f"idle-{group_id}-tap{tap_id}")
 
-    def cancel_idle(self, group_id: uuid.UUID) -> None:
-        """Stops the idle timer for an order (e.g., when activity is detected)."""
+    def cancel_idle_for_tap(self, group_id: uuid.UUID, tap_id: int) -> None:
+        """Stops the idle timer for a specific tap."""
         rt = self._groups.get(group_id)
         if rt is None:
             return
-        if rt.idle_task and not rt.idle_task.done():
-            rt.idle_task.cancel()
+        task = rt.idle_tasks.pop(tap_id, None)
+        if task and not task.done():
+            task.cancel()
+
+    def cancel_idle(self, group_id: uuid.UUID) -> None:
+        """Stops all per-tap idle timers for an order."""
+        rt = self._groups.get(group_id)
+        if rt is None:
+            return
+        for task in rt.idle_tasks.values():
+            if not task.done():
+                task.cancel()
+        rt.idle_tasks.clear()
 
 
 # Global singleton registry instance.

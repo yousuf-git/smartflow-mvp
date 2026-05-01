@@ -36,7 +36,7 @@ export default function WalletApp() {
   const [catalogue, setCatalogue] = useState<Catalogue | null>(null);
   const [selectedPlant, setSelectedPlant] = useState<Plant | null>(null);
   const [draft, setDraft] = useState<DraftCane[]>([]);
-  const [idleDeadline, setIdleDeadline] = useState<number | null>(null);
+  const [idleDeadlines, setIdleDeadlines] = useState<Record<number, number>>({});
   const wsRef = useRef<WebSocket | null>(null);
 
   const { toastProps, showToast } = useToast();
@@ -104,12 +104,41 @@ export default function WalletApp() {
       wsRef.current.close();
       wsRef.current = null;
     }
-    setIdleDeadline(null);
+    setIdleDeadlines({});
     setDraft([]);
     setSelectedPlant(null);
     await refreshMe();
     setScreen({ kind: "qr_scan" });
   }, [refreshMe]);
+
+  const idleSecs = Number(import.meta.env.VITE_IDLE_RELEASE_SECONDS ?? 90);
+
+  const armIdleForTaps = useCallback(
+    (canes: { tap_id: number; status: string }[]) => {
+      const pendingTaps = new Set<number>();
+      const startedTaps = new Set<number>();
+      for (const c of canes) {
+        if (c.status === "pending") pendingTaps.add(c.tap_id);
+        if (c.status === "started") startedTaps.add(c.tap_id);
+      }
+      setIdleDeadlines((prev) => {
+        const next = { ...prev };
+        for (const tap of pendingTaps) {
+          if (!startedTaps.has(tap) && !next[tap]) {
+            next[tap] = Date.now() + idleSecs * 1000;
+          }
+        }
+        for (const tap of startedTaps) {
+          delete next[tap];
+        }
+        for (const tap of Object.keys(next).map(Number)) {
+          if (!pendingTaps.has(tap)) delete next[tap];
+        }
+        return next;
+      });
+    },
+    [idleSecs],
+  );
 
   const applyFrame = useCallback(
     (frame: OrderFrame) => {
@@ -126,19 +155,17 @@ export default function WalletApp() {
             reason: frame.reason ?? c.reason,
           };
         });
+        if (frame.status !== "dispensing") {
+          armIdleForTaps(canes);
+        }
         return { ...prev, order: { ...prev.order, canes } };
       });
       if (frame.status !== "dispensing") {
         void refreshMe();
       }
     },
-    [refreshMe],
+    [refreshMe, armIdleForTaps],
   );
-
-  const armIdle = useCallback(() => {
-    const secs = Number(import.meta.env.VITE_IDLE_RELEASE_SECONDS ?? 90);
-    setIdleDeadline(Date.now() + secs * 1000);
-  }, []);
 
   const onConfirm = useCallback(async () => {
     if (!plant) return;
@@ -152,7 +179,7 @@ export default function WalletApp() {
       const order = await createOrder(plant.id, canes);
       await refreshMe();
       setScreen({ kind: "progress", order, startingCaneId: null });
-      armIdle();
+      armIdleForTaps(order.canes);
 
       const ws = openOrderSocket(order.id, {
         onFrame: (frame) => applyFrame(frame),
@@ -172,7 +199,7 @@ export default function WalletApp() {
       showToast(e.message ?? "Could not start session.", "error");
       setScreen({ kind: "home" });
     }
-  }, [plant, draft, refreshMe, applyFrame, armIdle, showToast]);
+  }, [plant, draft, refreshMe, applyFrame, armIdleForTaps, showToast]);
 
   const onStart = useCallback(
     async (caneId: number) => {
@@ -185,10 +212,10 @@ export default function WalletApp() {
         setScreen((prev) => {
           if (prev.kind !== "progress") return prev;
           const canes = prev.order.canes.map((c) => (c.id === cane.id ? cane : c));
+          armIdleForTaps(canes);
           return { ...prev, order: { ...prev.order, canes }, startingCaneId: null };
-        });
+        })
         await refreshMe();
-        armIdle();
       } catch (err) {
         const e = err as ApiErr;
         console.error("start.error", e);
@@ -199,7 +226,7 @@ export default function WalletApp() {
         );
       }
     },
-    [screen, refreshMe, armIdle, showToast],
+    [screen, refreshMe, armIdleForTaps, showToast],
   );
 
   const onStop = useCallback(
@@ -210,6 +237,7 @@ export default function WalletApp() {
         setScreen((prev) => {
           if (prev.kind !== "progress") return prev;
           const canes = prev.order.canes.map((c) => (c.id === cane.id ? cane : c));
+          armIdleForTaps(canes);
           return { ...prev, order: { ...prev.order, canes } };
         });
         await refreshMe();
@@ -219,7 +247,7 @@ export default function WalletApp() {
         showToast(e.message ?? "Could not stop.", "error");
       }
     },
-    [screen, refreshMe, showToast],
+    [screen, refreshMe, armIdleForTaps, showToast],
   );
 
   const onCancel = useCallback(async () => {
@@ -268,7 +296,10 @@ export default function WalletApp() {
   return (
     <div className="min-h-full w-full flex items-start justify-center p-4 sm:p-6">
       <main className="w-full max-w-3xl flex flex-col gap-4">
-        <WalletHeader me={me} />
+        <WalletHeader
+          me={me}
+          activeOrder={screen.kind === "progress" ? screen.order : null}
+        />
 
         {screen.kind === "home" || screen.kind === "submitting" ? (
           <CaneBuilder
@@ -284,7 +315,7 @@ export default function WalletApp() {
           <ProgressScreen
             order={screen.order}
             plant={plant}
-            idleDeadline={idleDeadline}
+            idleDeadlines={idleDeadlines}
             startingCaneId={screen.startingCaneId}
             onStart={onStart}
             onStop={onStop}

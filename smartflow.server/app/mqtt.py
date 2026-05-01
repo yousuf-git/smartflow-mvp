@@ -24,7 +24,7 @@ from typing import Optional
 
 import aiomqtt
 
-from app.config import Settings
+from app.config import Settings, get_settings
 from app.db import get_sessionmaker
 from app import purchase_service
 from app.runtime import registry
@@ -255,13 +255,30 @@ class MQTTClient:
             }
             await registry.push_progress(cane_id, frame)
 
-            # Cleanup: if the entire order (group) is finished, stop the idle disconnect timer.
             if cane.status in purchase_service.TERMINAL_STATUSES:
                 group = await purchase_service.load_group(session, cane.group_id)
-                if group is not None and all(
-                    p.status in purchase_service.TERMINAL_STATUSES for p in group.purchases
-                ):
-                    registry.cancel_idle(cane.group_id)
+                if group is not None:
+                    all_terminal = all(
+                        p.status in purchase_service.TERMINAL_STATUSES for p in group.purchases
+                    )
+                    if all_terminal:
+                        from app.models import PurchaseGroupStatus
+                        any_started = any(
+                            p.status in (PurchaseStatus.completed, PurchaseStatus.partial_completed, PurchaseStatus.failed)
+                            for p in group.purchases
+                        )
+                        group.status = PurchaseGroupStatus.completed if any_started else PurchaseGroupStatus.cancelled
+                        await session.commit()
+                        registry.cancel_idle(cane.group_id)
+                        await registry.close_group(cane.group_id)
+                    else:
+                        has_pending_on_tap = any(
+                            p.tap_id == cane.tap_id and p.status == PurchaseStatus.pending
+                            for p in group.purchases
+                        )
+                        if has_pending_on_tap:
+                            from app.routes import _arm_idle_for_tap
+                            _arm_idle_for_tap(cane.group_id, cane.tap_id, get_settings())
 
 
 # Global singleton instance of the MQTT client.

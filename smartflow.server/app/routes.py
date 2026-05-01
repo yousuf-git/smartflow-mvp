@@ -182,21 +182,19 @@ async def catalogue(session: AsyncSession = Depends(db_session)):
 
 # -- Order Lifecycle Logic ---------------------------------------------------
 
-def _arm_idle(group_id: uuid.UUID, settings: Settings) -> None:
+def _arm_idle_for_tap(group_id: uuid.UUID, tap_id: int, settings: Settings) -> None:
     """
-    Arms an automatic timeout for an order.
-    
-    If the user creates an order but never starts it (or stops halfway), this 
-    background task will eventually cancel it to release 'hold' balances 
-    and physical tap locks.
+    Arms a per-tap idle timeout.  When it fires, only pending canes on
+    that tap are cancelled.  If the whole group becomes terminal, the
+    runtime is closed.
     """
-    async def _fire(gid: uuid.UUID) -> None:
-        logger.info("order.idle.fire id=%s", gid)
+    async def _fire(gid: uuid.UUID, tid: int) -> None:
+        logger.info("order.idle.fire id=%s tap=%s", gid, tid)
         sm = get_sessionmaker()
         async with sm() as session:
             try:
                 group, cancelled = await purchase_service.cancel_pending_canes(
-                    session, gid, reason="idle_timeout"
+                    session, gid, reason="idle_timeout", tap_id=tid
                 )
                 await session.commit()
             except PurchaseError:
@@ -205,7 +203,6 @@ def _arm_idle(group_id: uuid.UUID, settings: Settings) -> None:
             if not cancelled:
                 return
             for cane in cancelled:
-                # Notify frontend about the idle cancellation
                 await registry.push_frame(
                     gid,
                     {
@@ -216,10 +213,28 @@ def _arm_idle(group_id: uuid.UUID, settings: Settings) -> None:
                         "reason": cane.reason,
                     },
                 )
-        if group.status == purchase_service.PurchaseGroupStatus.cancelled:
+        if group.status in (
+            purchase_service.PurchaseGroupStatus.completed,
+            purchase_service.PurchaseGroupStatus.cancelled,
+        ):
             await registry.close_group(gid)
 
-    registry.arm_idle(group_id, settings.IDLE_RELEASE_SECONDS, _fire)
+    registry.arm_idle_for_tap(group_id, tap_id, settings.IDLE_RELEASE_SECONDS, _fire)
+
+
+def _arm_idle_for_group(group_id: uuid.UUID, purchases: list, settings: Settings) -> None:
+    """Arms per-tap idle timers for every tap that has idle pending canes."""
+    taps_with_pending: set[int] = set()
+    taps_with_started: set[int] = set()
+    for p in purchases:
+        if p.status == PurchaseStatus.pending:
+            taps_with_pending.add(p.tap_id)
+        elif p.status == PurchaseStatus.started:
+            taps_with_started.add(p.tap_id)
+
+    for tap_id in taps_with_pending:
+        if tap_id not in taps_with_started:
+            _arm_idle_for_tap(group_id, tap_id, settings)
 
 
 @router.post("/order", response_model=OrderOut, status_code=201)
@@ -240,7 +255,7 @@ async def create_order(
         )
     except PurchaseError as exc:
         _raise_purchase_error(exc)
-    _arm_idle(group.id, settings)
+    _arm_idle_for_group(group.id, list(group.purchases), settings)
     return await _order_out(session, group)
 
 
@@ -325,7 +340,7 @@ async def start_cane(
             _raise_purchase_error(exc)
         cane_out = await _cane_out(new_session, cane)
 
-    _arm_idle(order_id, settings)
+    registry.cancel_idle_for_tap(order_id, cane.tap_id)
     return {"status": "accepted", "cane": cane_out}
 
 
@@ -385,12 +400,27 @@ async def stop_cane(
     }
     await registry.push_progress(cane.id, frame)
 
-    # Cleanup idle timer if this ends the order
     group = await purchase_service.load_group(session, cane.group_id)
-    if group is not None and all(
-        p.status in purchase_service.TERMINAL_STATUSES for p in group.purchases
-    ):
-        registry.cancel_idle(cane.group_id)
+    if group is not None:
+        all_terminal = all(
+            p.status in purchase_service.TERMINAL_STATUSES for p in group.purchases
+        )
+        if all_terminal:
+            any_started = any(
+                p.status in (PurchaseStatus.completed, PurchaseStatus.partial_completed, PurchaseStatus.failed)
+                for p in group.purchases
+            )
+            group.status = purchase_service.PurchaseGroupStatus.completed if any_started else purchase_service.PurchaseGroupStatus.cancelled
+            await session.commit()
+            registry.cancel_idle(cane.group_id)
+            await registry.close_group(cane.group_id)
+        else:
+            has_pending_on_tap = any(
+                p.tap_id == cane.tap_id and p.status == PurchaseStatus.pending
+                for p in group.purchases
+            )
+            if has_pending_on_tap:
+                _arm_idle_for_tap(cane.group_id, cane.tap_id, settings)
 
     return {"cane": cane_out}
 

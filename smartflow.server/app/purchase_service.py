@@ -334,9 +334,11 @@ async def cancel_pending_canes(
     session: AsyncSession,
     group_id: uuid.UUID,
     reason: str,
+    tap_id: int | None = None,
 ) -> tuple[PurchaseGroup, list[Purchase]]:
     """
-    Cancels all 'pending' canes in an order. 
+    Cancels pending canes in an order.
+    If tap_id is given, only cancels pending canes on that tap.
     Started canes are unaffected (must be stopped via progress/device).
     """
     group = (
@@ -355,13 +357,15 @@ async def cancel_pending_canes(
 
     cancelled: list[Purchase] = []
     for cane in canes:
-        if cane.status == PurchaseStatus.pending:
-            cane.status = PurchaseStatus.cancelled
-            cane.reason = reason
-            cane.completed_at = datetime.now(timezone.utc)
-            cancelled.append(cane)
+        if cane.status != PurchaseStatus.pending:
+            continue
+        if tap_id is not None and cane.tap_id != tap_id:
+            continue
+        cane.status = PurchaseStatus.cancelled
+        cane.reason = reason
+        cane.completed_at = datetime.now(timezone.utc)
+        cancelled.append(cane)
 
-    # Release taps if no more active canes on them
     for cane in cancelled:
         has_active_on_tap = any(
             c.tap_id == cane.tap_id and c.id != cane.id and c.status in (PurchaseStatus.pending, PurchaseStatus.started)
@@ -372,7 +376,6 @@ async def cancel_pending_canes(
             if tap is not None:
                 tap.is_available = True
 
-    # Check if the whole group is now terminal
     remaining_active = any(
         c.status in (PurchaseStatus.pending, PurchaseStatus.started) for c in canes
     )

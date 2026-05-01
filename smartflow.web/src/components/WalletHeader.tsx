@@ -1,11 +1,18 @@
 import { LinearProgress, Paper, Typography } from "@mui/material";
 import AccountBalanceWalletOutlinedIcon from "@mui/icons-material/AccountBalanceWalletOutlined";
-import type { Me } from "../lib/api";
+import type { Me, Order } from "../lib/api";
 
-type Props = { me: Me };
+type Props = { me: Me; activeOrder?: Order | null };
 
-export default function WalletHeader({ me }: Props) {
-  const usedLitres = me.daily_limit_litres - me.daily_remaining_litres;
+export default function WalletHeader({ me, activeOrder }: Props) {
+  const activeDelivery = activeOrder
+    ? activeOrder.canes
+        .filter((c) => c.status === "started")
+        .reduce((sum, c) => sum + c.litres_delivered, 0)
+    : 0;
+
+  const usedLitres = me.daily_consumed_litres + activeDelivery;
+  const remaining = Math.max(0, me.daily_limit_litres - usedLitres);
   const usedPct =
     me.daily_limit_litres > 0
       ? Math.min(100, (usedLitres / me.daily_limit_litres) * 100)
@@ -64,7 +71,7 @@ export default function WalletHeader({ me }: Props) {
 
           <div className="flex items-baseline justify-end gap-1">
             <Typography variant="subtitle1" sx={{ fontWeight: 700 }}>
-              {me.daily_remaining_litres.toFixed(1)} L
+              {remaining.toFixed(1)} L
             </Typography>
             <Typography variant="body2" sx={{ color: "text.secondary" }}>
               of {me.daily_limit_litres.toFixed(1)} L
