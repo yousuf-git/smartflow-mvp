@@ -6,6 +6,7 @@ import {
   getCustomerPlants,
   type CustomerPlant,
 } from "../../lib/customerApi";
+import { formatTime12h } from "../../lib/time";
 
 const DAY_NAMES = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
@@ -172,7 +173,7 @@ export default function CustomerPlants() {
                     <div className="space-y-1">
                       {slots.map((slot) => (
                         <div key={`${slot.day_of_week}-${slot.opening_time}-${slot.closing_time}`} className={`rounded-lg px-3 py-2 text-sm ${slot.is_closed ? "bg-slate-50 text-slate-500" : "bg-sky-50 text-sky-700"}`}>
-                          {slot.is_closed ? "Closed" : `${slot.opening_time} - ${slot.closing_time}`}
+                          {slot.is_closed ? "Closed" : `${formatTime12h(slot.opening_time)} - ${formatTime12h(slot.closing_time)}`}
                         </div>
                       ))}
                     </div>

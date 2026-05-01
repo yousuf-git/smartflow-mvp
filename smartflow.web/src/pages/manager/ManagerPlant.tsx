@@ -12,6 +12,7 @@ import {
   type AdminPlant, type OperatingHour,
 } from "../../lib/managerApi";
 import type { AdminPlantTap, AdminPlantController } from "../../lib/adminApi";
+import { formatTime12h } from "../../lib/time";
 import { useGlobalToast } from "../../contexts/ToastContext";
 
 const DAY_NAMES = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
@@ -41,7 +42,7 @@ function OperatingHoursGrid({
             <div className="space-y-1.5">
               {slots.map((slot) => (
                 <div key={slot.id} className={`flex items-center justify-between gap-2 rounded-md px-2 py-1.5 text-xs ${slot.is_closed ? "bg-slate-50 text-slate-500" : "bg-sky-50 text-sky-700"}`}>
-                  <span>{slot.is_closed ? "Closed" : `${slot.opening_time} - ${slot.closing_time}`}</span>
+                  <span>{slot.is_closed ? "Closed" : `${formatTime12h(slot.opening_time)} - ${formatTime12h(slot.closing_time)}`}</span>
                   <span className="flex items-center gap-0.5">
                     <IconButton size="small" onClick={() => onEdit(slot)} sx={{ p: 0.25 }}><Pencil className="w-3 h-3" /></IconButton>
                     <IconButton size="small" onClick={() => onDelete(slot)} sx={{ p: 0.25 }}><Trash2 className="w-3 h-3 text-red-400" /></IconButton>
