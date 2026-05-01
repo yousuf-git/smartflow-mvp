@@ -108,8 +108,10 @@ class MQTTClient:
         """
         s = self._settings
         backoff = 5.0
+        conn_n = 0
         loop = asyncio.get_event_loop()
         while True:
+            conn_n += 1
             connected_at = loop.time()
             try:
                 ssl_ctx = ssl.create_default_context(cafile=s.AWS_IOT_CA_PATH)
@@ -134,8 +136,8 @@ class MQTTClient:
 
                     self._ready.set()
                     logger.info(
-                        "mqtt.connected endpoint=%s port=%s controller=%s",
-                        s.AWS_IOT_ENDPOINT, s.AWS_IOT_PORT, s.CONTROLLER_NAME,
+                        "mqtt.connected n=%d endpoint=%s port=%s",
+                        conn_n, s.AWS_IOT_ENDPOINT, s.AWS_IOT_PORT,
                     )
 
                     async for message in client.messages:
@@ -145,15 +147,19 @@ class MQTTClient:
                 return
             except Exception as exc:
                 uptime = loop.time() - connected_at
-                logger.error("mqtt.disconnected err=%s uptime=%.1fs backoff=%.1fs", exc, uptime, backoff)
+                logger.error(
+                    "mqtt.disconnected n=%d err=%r uptime=%.1fs",
+                    conn_n, exc, uptime,
+                )
                 if uptime > 30:
                     backoff = 5.0
             finally:
                 self._client = None
                 self._ready.clear()
 
-            logger.info("mqtt.reconnecting in=%.1fs", backoff)
+            logger.info("mqtt.sleep n=%d backoff=%.1fs", conn_n, backoff)
             await asyncio.sleep(backoff)
+            logger.info("mqtt.woke n=%d", conn_n)
             backoff = min(backoff * 2, 60.0)
 
     async def _dispatch(self, topic: str, raw: bytes) -> None:
