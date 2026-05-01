@@ -69,6 +69,9 @@ class MQTTClient:
         if not self._settings.mqtt_configured:
             logger.warning("mqtt.disabled reason=not-configured")
             return
+        if self._task and not self._task.done():
+            logger.warning("mqtt.start.already-running")
+            return
         self._task = asyncio.create_task(self._run(), name="mqtt-loop")
 
     async def stop(self) -> None:
@@ -104,7 +107,7 @@ class MQTTClient:
         Maintains the TLS connection and listens for incoming messages.
         """
         s = self._settings
-        backoff = 2.0
+        backoff = 5.0
         loop = asyncio.get_event_loop()
         while True:
             connected_at = loop.time()
@@ -120,6 +123,7 @@ class MQTTClient:
                     tls_context=ssl_ctx,
                     keepalive=1200,
                 ) as client:
+                    client._client.reconnect_on_failure = False
                     self._client = client
                     connected_at = loop.time()
 
@@ -143,7 +147,7 @@ class MQTTClient:
                 uptime = loop.time() - connected_at
                 logger.error("mqtt.disconnected err=%s uptime=%.1fs backoff=%.1fs", exc, uptime, backoff)
                 if uptime > 30:
-                    backoff = 2.0
+                    backoff = 5.0
             finally:
                 self._client = None
                 self._ready.clear()
