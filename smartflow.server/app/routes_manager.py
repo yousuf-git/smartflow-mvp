@@ -18,15 +18,16 @@ Connections:
 """
 
 import logging
-from datetime import date, datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 from decimal import Decimal
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.auth import require_role
+from app.config import Settings, get_settings
 from app.db import get_sessionmaker
 from app.models import (
     Controller,
@@ -35,6 +36,7 @@ from app.models import (
     OperatingHour,
     Plant,
     PlantStatus,
+    Limit,
     Price,
     Purchase,
     PurchaseGroup,
@@ -48,6 +50,7 @@ from app.models import (
     WalletTransactionType,
 )
 from app.schemas import (
+    AuthUser,
     ControllerOut,
     CustomerListOut,
     ManagerDashboardOut,
@@ -56,9 +59,11 @@ from app.schemas import (
     OperatingHourUpdateIn,
     OrderListOut,
     PlantDetailOut,
+    ProfileUpdateIn,
     StatusUpdateIn,
     TapDetailOut,
 )
+from app.profile import update_profile, upload_avatar
 from app.system_log import log_event
 from app import wallet
 
@@ -71,6 +76,31 @@ async def _db():
     sm = get_sessionmaker()
     async with sm() as s:
         yield s
+
+
+@router.put("/profile", response_model=AuthUser)
+async def update_manager_profile(
+    body: ProfileUpdateIn,
+    manager: User = Depends(require_role(UserRole.manager)),
+    session: AsyncSession = Depends(_db),
+):
+    updated = await update_profile(session, manager, body)
+    await log_event(session, "info", f"Manager updated own profile: {updated.email}", "manager.profile", manager.id)
+    await session.commit()
+    return updated
+
+
+@router.post("/profile/avatar", response_model=AuthUser)
+async def upload_manager_avatar(
+    file: UploadFile = File(...),
+    manager: User = Depends(require_role(UserRole.manager)),
+    settings: Settings = Depends(get_settings),
+    session: AsyncSession = Depends(_db),
+):
+    updated = await upload_avatar(session, manager, file, settings)
+    await log_event(session, "info", f"Manager updated own avatar: {updated.email}", "manager.profile.avatar", manager.id)
+    await session.commit()
+    return updated
 
 
 def _require_plant(user: User) -> int:
@@ -385,6 +415,8 @@ async def delete_operating_hour(
 @router.get("/orders", response_model=list[OrderListOut])
 async def manager_orders(
     status: str | None = Query(None),
+    date_from: date | None = Query(None),
+    date_to: date | None = Query(None),
     user: User = Depends(require_role(UserRole.manager)),
     session: AsyncSession = Depends(_db),
 ):
@@ -398,6 +430,11 @@ async def manager_orders(
     )
     if status:
         q = q.where(PurchaseGroup.status == PurchaseGroupStatus(status))
+    if date_from:
+        q = q.where(PurchaseGroup.created_at >= datetime(date_from.year, date_from.month, date_from.day, tzinfo=timezone.utc))
+    if date_to:
+        end = datetime(date_to.year, date_to.month, date_to.day, tzinfo=timezone.utc) + timedelta(days=1)
+        q = q.where(PurchaseGroup.created_at < end)
 
     groups = (await session.scalars(q)).all()
     result = []
@@ -406,10 +443,16 @@ async def manager_orders(
         plant = await session.get(Plant, g.plant_id)
         total_litres = float(sum(p.litres_count for p in g.purchases))
         total_price = 0.0
+        unit_price = None
+        daily_litre_limit = None
         for p in g.purchases:
             pr = await session.get(Price, p.price_id)
             if pr:
+                unit_price = unit_price if unit_price is not None else float(pr.unit_price)
                 total_price += float((p.litres_count * pr.unit_price).quantize(Decimal("0.01")))
+            limit = await session.get(Limit, p.limit_id)
+            if limit and daily_litre_limit is None:
+                daily_litre_limit = float(limit.daily_litre_limit)
         result.append(OrderListOut(
             id=str(g.id),
             user_email=u.email if u else "",
@@ -417,6 +460,8 @@ async def manager_orders(
             status=g.status.value,
             total_litres=total_litres,
             total_price=total_price,
+            unit_price=unit_price,
+            daily_litre_limit=daily_litre_limit,
             cane_count=len(g.purchases),
             created_at=g.created_at,
         ))
@@ -466,6 +511,7 @@ async def manager_customers(
             email=c.user.email,
             first_name=c.user.first_name,
             last_name=c.user.last_name,
+            avatar_url=c.user.avatar_url,
             customer_type=c.customer_type.name,
             balance=bal,
             daily_consumed=consumed,

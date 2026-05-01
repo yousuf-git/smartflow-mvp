@@ -18,6 +18,7 @@ Connections:
 
 import logging
 
+from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import Settings
@@ -38,8 +39,16 @@ async def init_schema_and_seed(settings: Settings) -> None:
     """
     engine = get_engine()
     async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.drop_all)
+        # await conn.run_sync(Base.metadata.drop_all)   # if we want to reset the schema on every boot
         await conn.run_sync(Base.metadata.create_all)
+        await conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS avatar_url VARCHAR(512)"))
+        await conn.execute(text("ALTER TABLE customer_types ADD COLUMN IF NOT EXISTS description VARCHAR(512) DEFAULT ''"))
+        await conn.execute(text("ALTER TABLE customer_types ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ DEFAULT now()"))
+        await conn.execute(text("ALTER TABLE customer_types ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ DEFAULT now()"))
+        await conn.execute(text("ALTER TABLE prices ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ DEFAULT now()"))
+        await conn.execute(text("ALTER TABLE prices ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ DEFAULT now()"))
+        await conn.execute(text("ALTER TABLE limits ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ DEFAULT now()"))
+        await conn.execute(text("ALTER TABLE limits ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ DEFAULT now()"))
     logger.info("db.schema.ready")
 
     sm = get_sessionmaker()

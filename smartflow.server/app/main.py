@@ -24,6 +24,7 @@ from app.routes import router
 from app.routes_admin import router as admin_router
 from app.routes_auth import router as auth_router
 from app.routes_customer import router as customer_router
+from app.routes_locations import router as locations_router
 from app.routes_manager import router as manager_router
 from app.seed import init_schema_and_seed
 
@@ -91,6 +92,7 @@ app.include_router(router)           # /api/* (generic/system)
 app.include_router(admin_router)     # /api/admin/*
 app.include_router(manager_router)   # /api/manager/*
 app.include_router(customer_router)  # /api/customer/*
+app.include_router(locations_router) # /api/locations/*
 
 
 @app.get("/")

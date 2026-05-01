@@ -62,6 +62,10 @@ class Price(Base):
     currency: Mapped[str] = mapped_column(String(8), default="Rs.")
     unit_price: Mapped[Decimal] = mapped_column(Numeric(10, 2), default=Decimal("0"))
     timestamp: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
     is_active: Mapped[bool] = mapped_column(Boolean, default=False)
     deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True, default=None)
 
@@ -76,21 +80,30 @@ class Limit(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     daily_litre_limit: Mapped[Decimal] = mapped_column(Numeric(10, 2), default=Decimal("0"))
     timestamp: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
     is_active: Mapped[bool] = mapped_column(Boolean, default=False)
     deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True, default=None)
 
 
 class CustomerType(Base):
     """
-    Categorizes customers (e.g., 'Normal', 'Premium') and links them 
-    to specific active Price and Limit records.
+    Categorizes customers (e.g., 'Normal', 'Commercial') and links them 
+    to specific active Price and Limit plans.
     """
     __tablename__ = "customer_types"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     name: Mapped[str] = mapped_column(String(64), unique=True)
+    description: Mapped[str] = mapped_column(String(512), default="")
     price_id: Mapped[int] = mapped_column(ForeignKey("prices.id"))
     limit_id: Mapped[int] = mapped_column(ForeignKey("limits.id"))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
     deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True, default=None)
 
     price: Mapped[Price] = relationship(foreign_keys=[price_id])
@@ -126,6 +139,7 @@ class User(Base):
     plant_id: Mapped[int | None] = mapped_column(ForeignKey("plants.id"), nullable=True)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
     phone: Mapped[str | None] = mapped_column(String(20), nullable=True, default=None)
+    avatar_url: Mapped[str | None] = mapped_column(String(512), nullable=True, default=None)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True, default=None)
 

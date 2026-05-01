@@ -127,6 +127,7 @@ class AuthUser(BaseModel):
     last_name: str
     role: str
     phone: Optional[str] = None
+    avatar_url: Optional[str] = None
 
 
 class LoginOut(BaseModel):
@@ -145,10 +146,20 @@ class SignupIn(BaseModel):
     customer_type_id: int
 
 
+class ProfileUpdateIn(BaseModel):
+    """Fields a signed-in user can update on their own profile."""
+    first_name: Optional[str] = None
+    last_name: Optional[str] = None
+    email: Optional[str] = None
+    phone: Optional[str] = None
+    password: Optional[str] = Field(default=None, min_length=6)
+
+
 class CustomerTypePublicOut(BaseModel):
     """Public details about customer types, used during signup."""
     id: int
     name: str
+    description: str = ""
     unit_price: float
     daily_litre_limit: float
 
@@ -175,6 +186,7 @@ class UserListOut(BaseModel):
     last_name: str
     role: str
     phone: Optional[str] = None
+    avatar_url: Optional[str] = None
     created_at: datetime
     is_active: bool
     plant_name: Optional[str] = None
@@ -202,6 +214,7 @@ class UserUpdateIn(BaseModel):
     last_name: Optional[str] = None
     email: Optional[str] = None
     phone: Optional[str] = None
+    password: Optional[str] = Field(default=None, min_length=4)
     role: Optional[Literal["admin", "manager", "customer"]] = None
     is_active: Optional[bool] = None
     plant_id: Optional[int] = None
@@ -214,6 +227,7 @@ class CustomerListOut(BaseModel):
     email: str
     first_name: str
     last_name: str
+    avatar_url: Optional[str] = None
     customer_type: str
     balance: float
     daily_consumed: float
@@ -227,6 +241,8 @@ class OrderListOut(BaseModel):
     status: str
     total_litres: float
     total_price: float
+    unit_price: Optional[float] = None
+    daily_litre_limit: Optional[float] = None
     cane_count: int
     created_at: datetime
 
@@ -358,6 +374,7 @@ class OperatingHourUpdateIn(BaseModel):
 class CustomerTypeCreateIn(BaseModel):
     """Input for creating a new customer category."""
     name: str
+    description: str = ""
     price_id: int
     limit_id: int
 
@@ -365,6 +382,7 @@ class CustomerTypeCreateIn(BaseModel):
 class CustomerTypeUpdateIn(BaseModel):
     """Fields that can be updated for a customer category."""
     name: Optional[str] = None
+    description: Optional[str] = None
     price_id: Optional[int] = None
     limit_id: Optional[int] = None
 
@@ -402,6 +420,8 @@ class PriceOut(BaseModel):
     unit_price: float
     is_active: bool
     timestamp: datetime
+    created_at: datetime
+    updated_at: datetime
     deleted_at: Optional[datetime] = None
 
 
@@ -411,6 +431,8 @@ class LimitOut(BaseModel):
     daily_litre_limit: float
     is_active: bool
     timestamp: datetime
+    created_at: datetime
+    updated_at: datetime
     deleted_at: Optional[datetime] = None
 
 
@@ -418,10 +440,13 @@ class CustomerTypeOut(BaseModel):
     """Customer type details, including current price and limit values."""
     id: int
     name: str
+    description: str = ""
     price_id: int
     limit_id: int
     unit_price: float = 0
     daily_litre_limit: float = 0
+    created_at: datetime
+    updated_at: datetime
     deleted_at: Optional[datetime] = None
 
 
@@ -517,3 +542,15 @@ class CustomerPurchaseOut(BaseModel):
     total_price: float
     cane_count: int
     created_at: datetime
+
+
+class CustomerTopUpIn(BaseModel):
+    """Dummy wallet top-up request."""
+    amount: float = Field(gt=0)
+    method: Literal["Jazzcash", "Easypaisa"]
+
+
+class CustomerProfileUpdateIn(BaseModel):
+    """Inline editable customer profile fields."""
+    first_name: str = Field(min_length=1, max_length=64)
+    last_name: str = Field(min_length=1, max_length=64)

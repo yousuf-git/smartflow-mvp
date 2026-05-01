@@ -16,15 +16,19 @@ Connections:
 - Uses: app.wallet, app.models, app.schemas, app.auth.
 """
 
+import hashlib
 import logging
+import time
 from decimal import Decimal
 
-from fastapi import APIRouter, Depends
+import httpx
+from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.auth import require_role
+from app.config import Settings, get_settings
 from app.db import get_sessionmaker
 from app.models import (
     OperatingHour,
@@ -41,10 +45,13 @@ from app.models import (
     WalletTransactionType,
 )
 from app.schemas import (
+    AuthUser,
     CustomerDashboardOut,
     CustomerPlantOut,
+    CustomerProfileUpdateIn,
     CustomerPurchaseOut,
     CustomerTapOut,
+    CustomerTopUpIn,
     OperatingHourOut,
     TransactionListOut,
 )
@@ -52,6 +59,8 @@ from app import wallet
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/customer", tags=["customer"])
+
+MAX_AVATAR_BYTES = 2 * 1024 * 1024
 
 
 async def _db():
@@ -236,3 +245,118 @@ async def customer_plants(
             ],
         ))
     return result
+
+
+@router.post("/top-up", response_model=TransactionListOut)
+async def customer_top_up(
+    body: CustomerTopUpIn,
+    user: User = Depends(require_role(UserRole.customer)),
+    session: AsyncSession = Depends(_db),
+):
+    """Dummy wallet top-up used by the customer app."""
+    tx = WalletTransaction(
+        user_id=user.id,
+        amount=Decimal(str(body.amount)),
+        transaction_type=WalletTransactionType.credit,
+    )
+    session.add(tx)
+    await session.commit()
+    await session.refresh(tx)
+    return TransactionListOut(
+        id=tx.id,
+        user_email=user.email,
+        amount=float(tx.amount),
+        type=tx.transaction_type.value,
+        timestamp=tx.timestamp,
+        purchase_id=tx.purchase_id,
+    )
+
+
+@router.put("/profile", response_model=AuthUser)
+async def update_customer_profile(
+    body: CustomerProfileUpdateIn,
+    user: User = Depends(require_role(UserRole.customer)),
+    session: AsyncSession = Depends(_db),
+):
+    """Updates customer display name fields."""
+    db_user = await session.get(User, user.id)
+    if db_user is None:
+        raise HTTPException(status_code=404, detail="user_not_found")
+    db_user.first_name = body.first_name.strip()
+    db_user.last_name = body.last_name.strip()
+    await session.commit()
+    return AuthUser(
+        id=db_user.id,
+        email=db_user.email,
+        first_name=db_user.first_name,
+        last_name=db_user.last_name,
+        role=db_user.role.value,
+        phone=db_user.phone,
+        avatar_url=db_user.avatar_url,
+    )
+
+
+@router.post("/profile/avatar", response_model=AuthUser)
+async def upload_customer_avatar(
+    file: UploadFile = File(...),
+    user: User = Depends(require_role(UserRole.customer)),
+    settings: Settings = Depends(get_settings),
+    session: AsyncSession = Depends(_db),
+):
+    """Uploads a validated avatar image to Cloudinary and stores the secure URL."""
+    if not (
+        settings.CLOUDINARY_CLOUD_NAME
+        and settings.CLOUDINARY_API_KEY
+        and settings.CLOUDINARY_API_SECRET
+    ):
+        raise HTTPException(status_code=503, detail="cloudinary_not_configured")
+
+    if file.content_type not in {"image/png", "image/jpeg", "image/webp"}:
+        raise HTTPException(status_code=400, detail="avatar_invalid_type")
+
+    content = await file.read(MAX_AVATAR_BYTES + 1)
+    if len(content) > MAX_AVATAR_BYTES:
+        raise HTTPException(status_code=400, detail="avatar_too_large")
+
+    timestamp = str(int(time.time()))
+    folder = "smartflow/avatars"
+    public_id = f"user_{user.id}_{timestamp}"
+    signature_payload = f"folder={folder}&public_id={public_id}&timestamp={timestamp}{settings.CLOUDINARY_API_SECRET}"
+    signature = hashlib.sha1(signature_payload.encode("utf-8")).hexdigest()
+
+    upload_url = f"https://api.cloudinary.com/v1_1/{settings.CLOUDINARY_CLOUD_NAME}/image/upload"
+    async with httpx.AsyncClient(timeout=20) as client:
+        response = await client.post(
+            upload_url,
+            data={
+                "api_key": settings.CLOUDINARY_API_KEY,
+                "timestamp": timestamp,
+                "folder": folder,
+                "public_id": public_id,
+                "signature": signature,
+            },
+            files={"file": (file.filename or "avatar.png", content, file.content_type)},
+        )
+
+    if response.status_code >= 400:
+        raise HTTPException(status_code=502, detail="cloudinary_upload_failed")
+
+    secure_url = response.json().get("secure_url")
+    if not secure_url:
+        raise HTTPException(status_code=502, detail="cloudinary_url_missing")
+
+    db_user = await session.get(User, user.id)
+    if db_user is None:
+        raise HTTPException(status_code=404, detail="user_not_found")
+    db_user.avatar_url = secure_url
+    await session.commit()
+
+    return AuthUser(
+        id=db_user.id,
+        email=db_user.email,
+        first_name=db_user.first_name,
+        last_name=db_user.last_name,
+        role=db_user.role.value,
+        phone=db_user.phone,
+        avatar_url=db_user.avatar_url,
+    )

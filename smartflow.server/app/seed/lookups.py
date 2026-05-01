@@ -24,11 +24,11 @@ from app.models import CustomerType, Limit, Price
 logger = logging.getLogger(__name__)
 
 
-# (name, unit_price, daily_litre_limit)
+# (name, description, unit_price, daily_litre_limit)
 # Defines the initial system-wide pricing structure.
-_TYPES: list[tuple[str, Decimal, Decimal]] = [
-    ("normal", Decimal("5.00"), Decimal("50")),
-    ("commercial", Decimal("4.00"), Decimal("200")),
+_TYPES: list[tuple[str, str, Decimal, Decimal]] = [
+    ("normal", "Balanced rate and daily allowance for everyday household water use.", Decimal("5.00"), Decimal("50")),
+    ("commercial", "Larger daily allowance for businesses and frequent collection needs.", Decimal("4.00"), Decimal("200")),
 ]
 
 
@@ -39,11 +39,13 @@ async def seed(session: AsyncSession, settings: Settings) -> None:
     If a CustomerType with a specific name already exists, it is skipped 
     to prevent duplicate entries or accidental overwrites of modified rates.
     """
-    existing_names = set(
-        (await session.scalars(select(CustomerType.name))).all()
-    )
-    for name, unit_price, daily_limit in _TYPES:
-        if name in existing_names:
+    existing_types = {
+        ct.name: ct for ct in (await session.scalars(select(CustomerType))).all()
+    }
+    for name, description, unit_price, daily_limit in _TYPES:
+        if name in existing_types:
+            if not existing_types[name].description:
+                existing_types[name].description = description
             continue
             
         # Create a new version of price and limit for this type.
@@ -53,7 +55,7 @@ async def seed(session: AsyncSession, settings: Settings) -> None:
         await session.flush()
         
         # Link the type to the newly created snapshots.
-        ct = CustomerType(name=name, price_id=price.id, limit_id=limit.id)
+        ct = CustomerType(name=name, description=description, price_id=price.id, limit_id=limit.id)
         session.add(ct)
         logger.info(
             "seed.customer_type name=%s unit_price=%s limit=%s",

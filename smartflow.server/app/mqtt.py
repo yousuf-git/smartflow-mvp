@@ -96,14 +96,15 @@ class MQTTClient:
 
     async def _run(self) -> None:
         """
-        The core MQTT loop. 
+        The core MQTT loop.
         Maintains the TLS connection and listens for incoming messages.
         """
         s = self._settings
-        backoff = 1.0
+        backoff = 2.0
+        loop = asyncio.get_event_loop()
         while True:
+            connected_at = loop.time()
             try:
-                # Configure TLS for AWS IoT Core
                 tls_params = aiomqtt.TLSParameters(
                     ca_certs=s.AWS_IOT_CA_PATH,
                     certfile=s.AWS_IOT_CERT_PATH,
@@ -119,34 +120,35 @@ class MQTTClient:
                     keepalive=60,
                 ) as client:
                     self._client = client
-                    backoff = 1.0
-                    
-                    # Subscribe to feedback topics
+                    connected_at = loop.time()
+
                     await client.subscribe(ack_topic(s.CONTROLLER_NAME), qos=1)
                     await client.subscribe(progress_topic(s.CONTROLLER_NAME), qos=1)
-                    
+
                     self._ready.set()
                     logger.info(
                         "mqtt.connected endpoint=%s controller=%s",
                         s.AWS_IOT_ENDPOINT,
                         s.CONTROLLER_NAME,
                     )
-                    
-                    # Message processing loop
+
                     async for message in client.messages:
                         await self._dispatch(str(message.topic), message.payload)
             except asyncio.CancelledError:
                 logger.info("mqtt.stopped")
                 return
             except Exception as exc:
-                logger.exception("mqtt.disconnected err=%s", exc)
+                uptime = loop.time() - connected_at
+                logger.error("mqtt.disconnected err=%s uptime=%.1fs backoff=%.1fs", exc, uptime, backoff)
+                if uptime > 30:
+                    backoff = 2.0
             finally:
                 self._client = None
                 self._ready.clear()
-            
-            # Reconnection logic
+
+            logger.info("mqtt.reconnecting in=%.1fs", backoff)
             await asyncio.sleep(backoff)
-            backoff = min(backoff * 2, 30.0)
+            backoff = min(backoff * 2, 60.0)
 
     async def _dispatch(self, topic: str, raw: bytes) -> None:
         """

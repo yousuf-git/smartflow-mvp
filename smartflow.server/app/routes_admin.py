@@ -23,12 +23,13 @@ import logging
 from datetime import date, datetime, timedelta, timezone
 from decimal import Decimal
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.auth import hash_password, require_role
+from app.config import Settings, get_settings
 from app.db import get_sessionmaker
 from app.models import (
     Controller,
@@ -56,6 +57,7 @@ from app.models import (
 from app.schemas import (
     AdminChartData,
     AdminDashboardOut,
+    AuthUser,
     ChartDataPoint,
     ControllerCreateIn,
     ControllerOut,
@@ -78,6 +80,7 @@ from app.schemas import (
     PriceCreateIn,
     PriceOut,
     PriceUpdateIn,
+    ProfileUpdateIn,
     SystemLogOut,
     TapCreateIn,
     TapDetailOut,
@@ -86,6 +89,7 @@ from app.schemas import (
     UserListOut,
     UserUpdateIn,
 )
+from app.profile import update_profile, upload_avatar
 from app.system_log import log_event
 from app import wallet
 
@@ -103,6 +107,31 @@ async def _db(session=None):
     sm = get_sessionmaker()
     async with sm() as s:
         yield s
+
+
+@router.put("/profile", response_model=AuthUser)
+async def update_admin_profile(
+    body: ProfileUpdateIn,
+    admin: User = Depends(require_role(UserRole.admin)),
+    session: AsyncSession = Depends(_db),
+):
+    updated = await update_profile(session, admin, body)
+    await log_event(session, "info", f"Admin updated own profile: {updated.email}", "admin.profile", admin.id)
+    await session.commit()
+    return updated
+
+
+@router.post("/profile/avatar", response_model=AuthUser)
+async def upload_admin_avatar(
+    file: UploadFile = File(...),
+    admin: User = Depends(require_role(UserRole.admin)),
+    settings: Settings = Depends(get_settings),
+    session: AsyncSession = Depends(_db),
+):
+    updated = await upload_avatar(session, admin, file, settings)
+    await log_event(session, "info", f"Admin updated own avatar: {updated.email}", "admin.profile.avatar", admin.id)
+    await session.commit()
+    return updated
 
 
 # ---------------------------------------------------------------------------
@@ -247,7 +276,7 @@ async def list_users(
                 balance = float(await wallet.balance(session, u.id))
         result.append(UserListOut(
             id=u.id, email=u.email, first_name=u.first_name, last_name=u.last_name,
-            role=u.role.value, phone=u.phone, created_at=u.created_at, is_active=u.is_active,
+            role=u.role.value, phone=u.phone, avatar_url=u.avatar_url, created_at=u.created_at, is_active=u.is_active,
             plant_name=plant_name, deleted_at=u.deleted_at, customer_type=customer_type, balance=balance,
         ))
     return result
@@ -296,7 +325,7 @@ async def create_user(
 
     return UserListOut(
         id=user.id, email=user.email, first_name=user.first_name, last_name=user.last_name,
-        role=user.role.value, phone=user.phone, created_at=user.created_at, is_active=user.is_active,
+        role=user.role.value, phone=user.phone, avatar_url=user.avatar_url, created_at=user.created_at, is_active=user.is_active,
         plant_name=plant_name, customer_type=customer_type, balance=balance,
     )
 
@@ -323,9 +352,13 @@ async def update_user(
         user.email = body.email
     if body.phone is not None:
         user.phone = body.phone
+    if body.password is not None:
+        user.password_hash = hash_password(body.password)
     if body.role is not None:
         user.role = UserRole(body.role)
     if body.is_active is not None:
+        if user.id == admin.id and body.is_active is False:
+            raise HTTPException(status_code=400, detail="cannot_disable_self")
         user.is_active = body.is_active
     if body.plant_id is not None:
         user.plant_id = body.plant_id
@@ -355,7 +388,7 @@ async def update_user(
 
     return UserListOut(
         id=user.id, email=user.email, first_name=user.first_name, last_name=user.last_name,
-        role=user.role.value, phone=user.phone, created_at=user.created_at, is_active=user.is_active,
+        role=user.role.value, phone=user.phone, avatar_url=user.avatar_url, created_at=user.created_at, is_active=user.is_active,
         plant_name=plant_name, deleted_at=user.deleted_at, customer_type=customer_type, balance=balance,
     )
 
@@ -682,7 +715,17 @@ async def list_customer_types(
         select(CustomerType).where(CustomerType.deleted_at.is_(None)).options(selectinload(CustomerType.price), selectinload(CustomerType.limit))
     )).all()
     return [
-        CustomerTypeOut(id=ct.id, name=ct.name, price_id=ct.price_id, limit_id=ct.limit_id, unit_price=float(ct.price.unit_price), daily_litre_limit=float(ct.limit.daily_litre_limit))
+        CustomerTypeOut(
+            id=ct.id,
+            name=ct.name,
+            description=ct.description,
+            price_id=ct.price_id,
+            limit_id=ct.limit_id,
+            unit_price=float(ct.price.unit_price),
+            daily_litre_limit=float(ct.limit.daily_litre_limit),
+            created_at=ct.created_at,
+            updated_at=ct.updated_at,
+        )
         for ct in types
     ]
 
@@ -699,12 +742,26 @@ async def create_customer_type(
     limit = await session.get(Limit, body.limit_id)
     if limit is None or limit.deleted_at is not None:
         raise HTTPException(status_code=400, detail="invalid_limit")
-    ct = CustomerType(name=body.name, price_id=body.price_id, limit_id=body.limit_id)
+    ct = CustomerType(name=body.name, description=body.description, price_id=body.price_id, limit_id=body.limit_id)
     session.add(ct)
     await log_event(session, "info", f"Admin created customer type: {body.name}", "admin.customer_types", admin.id)
     await session.commit()
     await session.refresh(ct)
-    return CustomerTypeOut(id=ct.id, name=ct.name, price_id=ct.price_id, limit_id=ct.limit_id, unit_price=float(price.unit_price), daily_litre_limit=float(limit.daily_litre_limit))
+    price = await session.get(Price, ct.price_id)
+    limit = await session.get(Limit, ct.limit_id)
+    if price is None or limit is None:
+        raise HTTPException(status_code=500, detail="customer_type_relation_missing")
+    return CustomerTypeOut(
+        id=ct.id,
+        name=ct.name,
+        description=ct.description,
+        price_id=ct.price_id,
+        limit_id=ct.limit_id,
+        unit_price=float(price.unit_price),
+        daily_litre_limit=float(limit.daily_litre_limit),
+        created_at=ct.created_at,
+        updated_at=ct.updated_at,
+    )
 
 
 @router.put("/customer-types/{ct_id}", response_model=CustomerTypeOut)
@@ -718,6 +775,7 @@ async def update_customer_type(
     if ct is None or ct.deleted_at is not None:
         raise HTTPException(status_code=404, detail="customer_type_not_found")
     if body.name is not None: ct.name = body.name
+    if body.description is not None: ct.description = body.description
     if body.price_id is not None:
         price = await session.get(Price, body.price_id)
         if price is None or price.deleted_at is not None:
@@ -730,8 +788,22 @@ async def update_customer_type(
         ct.limit_id = body.limit_id
     await log_event(session, "info", f"Admin updated customer type: {ct.name}", "admin.customer_types", admin.id)
     await session.commit()
-    await session.refresh(ct, attribute_names=["price", "limit"])
-    return CustomerTypeOut(id=ct.id, name=ct.name, price_id=ct.price_id, limit_id=ct.limit_id, unit_price=float(ct.price.unit_price), daily_litre_limit=float(ct.limit.daily_litre_limit))
+    await session.refresh(ct)
+    price = await session.get(Price, ct.price_id)
+    limit = await session.get(Limit, ct.limit_id)
+    if price is None or limit is None:
+        raise HTTPException(status_code=500, detail="customer_type_relation_missing")
+    return CustomerTypeOut(
+        id=ct.id,
+        name=ct.name,
+        description=ct.description,
+        price_id=ct.price_id,
+        limit_id=ct.limit_id,
+        unit_price=float(price.unit_price),
+        daily_litre_limit=float(limit.daily_litre_limit),
+        created_at=ct.created_at,
+        updated_at=ct.updated_at,
+    )
 
 
 @router.delete("/customer-types/{ct_id}", status_code=200)
@@ -761,7 +833,18 @@ async def list_prices(
     prices = (await session.scalars(
         select(Price).where(Price.deleted_at.is_(None)).order_by(Price.timestamp.desc())
     )).all()
-    return [PriceOut(id=p.id, currency=p.currency, unit_price=float(p.unit_price), is_active=p.is_active, timestamp=p.timestamp) for p in prices]
+    return [
+        PriceOut(
+            id=p.id,
+            currency=p.currency,
+            unit_price=float(p.unit_price),
+            is_active=p.is_active,
+            timestamp=p.timestamp,
+            created_at=p.created_at,
+            updated_at=p.updated_at,
+        )
+        for p in prices
+    ]
 
 
 @router.post("/prices", response_model=PriceOut, status_code=201)
@@ -775,7 +858,15 @@ async def create_price(
     await log_event(session, "info", f"Admin created price: Rs. {body.unit_price}", "admin.prices", admin.id)
     await session.commit()
     await session.refresh(price)
-    return PriceOut(id=price.id, currency=price.currency, unit_price=float(price.unit_price), is_active=price.is_active, timestamp=price.timestamp)
+    return PriceOut(
+        id=price.id,
+        currency=price.currency,
+        unit_price=float(price.unit_price),
+        is_active=price.is_active,
+        timestamp=price.timestamp,
+        created_at=price.created_at,
+        updated_at=price.updated_at,
+    )
 
 
 @router.put("/prices/{price_id}", response_model=PriceOut)
@@ -792,7 +883,16 @@ async def update_price(
     if body.is_active is not None: price.is_active = body.is_active
     await log_event(session, "info", f"Admin updated price #{price_id}", "admin.prices", admin.id)
     await session.commit()
-    return PriceOut(id=price.id, currency=price.currency, unit_price=float(price.unit_price), is_active=price.is_active, timestamp=price.timestamp)
+    await session.refresh(price)
+    return PriceOut(
+        id=price.id,
+        currency=price.currency,
+        unit_price=float(price.unit_price),
+        is_active=price.is_active,
+        timestamp=price.timestamp,
+        created_at=price.created_at,
+        updated_at=price.updated_at,
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -807,7 +907,17 @@ async def list_limits(
     limits = (await session.scalars(
         select(Limit).where(Limit.deleted_at.is_(None)).order_by(Limit.timestamp.desc())
     )).all()
-    return [LimitOut(id=l.id, daily_litre_limit=float(l.daily_litre_limit), is_active=l.is_active, timestamp=l.timestamp) for l in limits]
+    return [
+        LimitOut(
+            id=l.id,
+            daily_litre_limit=float(l.daily_litre_limit),
+            is_active=l.is_active,
+            timestamp=l.timestamp,
+            created_at=l.created_at,
+            updated_at=l.updated_at,
+        )
+        for l in limits
+    ]
 
 
 @router.post("/limits", response_model=LimitOut, status_code=201)
@@ -821,7 +931,14 @@ async def create_limit(
     await log_event(session, "info", f"Admin created limit: {body.daily_litre_limit} L/day", "admin.limits", admin.id)
     await session.commit()
     await session.refresh(limit)
-    return LimitOut(id=limit.id, daily_litre_limit=float(limit.daily_litre_limit), is_active=limit.is_active, timestamp=limit.timestamp)
+    return LimitOut(
+        id=limit.id,
+        daily_litre_limit=float(limit.daily_litre_limit),
+        is_active=limit.is_active,
+        timestamp=limit.timestamp,
+        created_at=limit.created_at,
+        updated_at=limit.updated_at,
+    )
 
 
 @router.put("/limits/{limit_id}", response_model=LimitOut)
@@ -838,7 +955,15 @@ async def update_limit(
     if body.is_active is not None: limit.is_active = body.is_active
     await log_event(session, "info", f"Admin updated limit #{limit_id}", "admin.limits", admin.id)
     await session.commit()
-    return LimitOut(id=limit.id, daily_litre_limit=float(limit.daily_litre_limit), is_active=limit.is_active, timestamp=limit.timestamp)
+    await session.refresh(limit)
+    return LimitOut(
+        id=limit.id,
+        daily_litre_limit=float(limit.daily_litre_limit),
+        is_active=limit.is_active,
+        timestamp=limit.timestamp,
+        created_at=limit.created_at,
+        updated_at=limit.updated_at,
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -877,6 +1002,7 @@ async def list_customers(
         consumed = float(await wallet.daily_consumed_litres(session, c.user_id))
         result.append(CustomerListOut(
             user_id=c.user_id, email=c.user.email, first_name=c.user.first_name, last_name=c.user.last_name,
+            avatar_url=c.user.avatar_url,
             customer_type=c.customer_type.name, balance=bal, daily_consumed=consumed,
         ))
     return result
@@ -889,12 +1015,19 @@ async def list_customers(
 @router.get("/orders", response_model=list[OrderListOut])
 async def list_orders(
     status: str | None = Query(None),
+    date_from: date | None = Query(None),
+    date_to: date | None = Query(None),
     _user: User = Depends(require_role(UserRole.admin)),
     session: AsyncSession = Depends(_db),
 ):
     q = select(PurchaseGroup).options(selectinload(PurchaseGroup.purchases)).order_by(PurchaseGroup.created_at.desc())
     if status:
         q = q.where(PurchaseGroup.status == PurchaseGroupStatus(status))
+    if date_from:
+        q = q.where(PurchaseGroup.created_at >= datetime(date_from.year, date_from.month, date_from.day, tzinfo=timezone.utc))
+    if date_to:
+        end = datetime(date_to.year, date_to.month, date_to.day, tzinfo=timezone.utc) + timedelta(days=1)
+        q = q.where(PurchaseGroup.created_at < end)
     groups = (await session.scalars(q)).all()
     result = []
     for g in groups:
@@ -902,13 +1035,20 @@ async def list_orders(
         plant = await session.get(Plant, g.plant_id)
         total_litres = float(sum(p.litres_count for p in g.purchases))
         total_price = 0.0
+        unit_price = None
+        daily_litre_limit = None
         for p in g.purchases:
             pr = await session.get(Price, p.price_id)
             if pr:
+                unit_price = unit_price if unit_price is not None else float(pr.unit_price)
                 total_price += float((p.litres_count * pr.unit_price).quantize(Decimal("0.01")))
+            limit = await session.get(Limit, p.limit_id)
+            if limit and daily_litre_limit is None:
+                daily_litre_limit = float(limit.daily_litre_limit)
         result.append(OrderListOut(
             id=str(g.id), user_email=user.email if user else "", plant_name=plant.name if plant else "",
             status=g.status.value, total_litres=total_litres, total_price=total_price,
+            unit_price=unit_price, daily_litre_limit=daily_litre_limit,
             cane_count=len(g.purchases), created_at=g.created_at,
         ))
     return result
