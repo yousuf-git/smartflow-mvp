@@ -66,13 +66,17 @@ class MQTTClient:
 
     async def start(self) -> None:
         """Starts the MQTT background loop task."""
+        import traceback
+        caller = "".join(traceback.format_stack(limit=3)).strip()
+        logger.info("mqtt.start called from:\n%s", caller)
         if not self._settings.mqtt_configured:
             logger.warning("mqtt.disabled reason=not-configured")
             return
         if self._task and not self._task.done():
-            logger.warning("mqtt.start.already-running")
+            logger.warning("mqtt.start.already-running task=%s", id(self._task))
             return
         self._task = asyncio.create_task(self._run(), name="mqtt-loop")
+        logger.info("mqtt.start.created task=%s", id(self._task))
 
     async def stop(self) -> None:
         """Gracefully stops the MQTT client and cancels the loop task."""
@@ -295,5 +299,6 @@ def get_mqtt_client() -> MQTTClient:
 def init_mqtt_client(settings: Settings) -> MQTTClient:
     """Initializes the global MQTT client singleton."""
     global _mqtt_client
+    logger.info("mqtt.init called, existing=%s", _mqtt_client is not None)
     _mqtt_client = MQTTClient(settings)
     return _mqtt_client
