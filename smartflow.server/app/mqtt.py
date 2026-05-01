@@ -109,18 +109,17 @@ class MQTTClient:
         while True:
             connected_at = loop.time()
             try:
-                tls_params = aiomqtt.TLSParameters(
-                    ca_certs=s.AWS_IOT_CA_PATH,
-                    certfile=s.AWS_IOT_CERT_PATH,
-                    keyfile=s.AWS_IOT_KEY_PATH,
-                    cert_reqs=ssl.CERT_REQUIRED,
-                    tls_version=ssl.PROTOCOL_TLSv1_2,
-                )
+                ssl_ctx = ssl.SSLContext(ssl.PROTOCOL_TLSv1_2)
+                ssl_ctx.load_verify_locations(s.AWS_IOT_CA_PATH)
+                ssl_ctx.load_cert_chain(s.AWS_IOT_CERT_PATH, s.AWS_IOT_KEY_PATH)
+                ssl_ctx.verify_mode = ssl.CERT_REQUIRED
+                if s.AWS_IOT_PORT == 443:
+                    ssl_ctx.set_alpn_protocols(["x-amzn-mqtt-ca"])
                 async with aiomqtt.Client(
                     hostname=s.AWS_IOT_ENDPOINT,
                     port=s.AWS_IOT_PORT,
                     identifier=s.AWS_IOT_CLIENT_ID,
-                    tls_params=tls_params,
+                    tls_context=ssl_ctx,
                     keepalive=60,
                 ) as client:
                     self._client = client
