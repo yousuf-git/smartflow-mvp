@@ -108,11 +108,10 @@ class MQTTClient:
         """
         s = self._settings
         backoff = 5.0
-        conn_n = 0
         loop = asyncio.get_event_loop()
         while True:
-            conn_n += 1
             connected_at = loop.time()
+            paho_client = None
             try:
                 ssl_ctx = ssl.create_default_context(cafile=s.AWS_IOT_CA_PATH)
                 ssl_ctx.load_cert_chain(s.AWS_IOT_CERT_PATH, s.AWS_IOT_KEY_PATH)
@@ -125,6 +124,7 @@ class MQTTClient:
                     tls_context=ssl_ctx,
                     keepalive=30,
                 )
+                paho_client = mqtt_client._client
                 async with mqtt_client as client:
                     self._client = client
                     connected_at = loop.time()
@@ -136,8 +136,8 @@ class MQTTClient:
 
                     self._ready.set()
                     logger.info(
-                        "mqtt.connected n=%d endpoint=%s port=%s",
-                        conn_n, s.AWS_IOT_ENDPOINT, s.AWS_IOT_PORT,
+                        "mqtt.connected endpoint=%s port=%s controller=%s",
+                        s.AWS_IOT_ENDPOINT, s.AWS_IOT_PORT, s.CONTROLLER_NAME,
                     )
 
                     async for message in client.messages:
@@ -147,19 +147,20 @@ class MQTTClient:
                 return
             except Exception as exc:
                 uptime = loop.time() - connected_at
-                logger.error(
-                    "mqtt.disconnected n=%d err=%r uptime=%.1fs",
-                    conn_n, exc, uptime,
-                )
+                logger.error("mqtt.disconnected err=%s uptime=%.1fs backoff=%.1fs", exc, uptime, backoff)
                 if uptime > 30:
                     backoff = 5.0
             finally:
                 self._client = None
                 self._ready.clear()
+                if paho_client is not None:
+                    try:
+                        paho_client.disconnect()
+                    except Exception:
+                        pass
 
-            logger.info("mqtt.sleep n=%d backoff=%.1fs", conn_n, backoff)
+            logger.info("mqtt.reconnecting in=%.1fs", backoff)
             await asyncio.sleep(backoff)
-            logger.info("mqtt.woke n=%d", conn_n)
             backoff = min(backoff * 2, 60.0)
 
     async def _dispatch(self, topic: str, raw: bytes) -> None:
