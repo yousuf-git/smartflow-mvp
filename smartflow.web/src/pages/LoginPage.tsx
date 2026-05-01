@@ -143,12 +143,10 @@ export default function LoginPage() {
 
   return (
     <div className="flex min-h-screen">
-      {/* Left branding panel — hidden on mobile */}
       <div className="hidden lg:flex lg:w-[45%] relative overflow-hidden flex-col justify-between p-12 text-white bg-gradient-to-br from-slate-900 via-sky-950 to-cyan-900">
         <WavePattern />
         <FloatingDroplets />
 
-        {/* Radial glow */}
         <div className="absolute top-1/4 left-1/2 -translate-x-1/2 w-[500px] h-[500px] bg-cyan-500/10 rounded-full blur-[120px]" />
 
         <motion.div
@@ -201,10 +199,8 @@ export default function LoginPage() {
         </motion.div>
       </div>
 
-      {/* Right form panel */}
       <div className="flex-1 flex items-center justify-center p-8 sm:p-12 bg-paper">
         <div className="w-full max-w-md">
-          {/* Mobile logo */}
           <div className="flex items-center gap-2.5 mb-8 lg:hidden">
             <div className="w-9 h-9 rounded-lg bg-aqua-600 flex items-center justify-center">
               <Droplets className="w-5 h-5 text-white" />
@@ -225,7 +221,7 @@ export default function LoginPage() {
             </Alert>
           )}
 
-          <form onSubmit={handleSubmit} className="space-y-5">
+            <form onSubmit={handleSubmit} className="flex flex-col gap-5">
             <TextField
               fullWidth
               placeholder="Email"
@@ -235,13 +231,13 @@ export default function LoginPage() {
               autoComplete="email"
               autoFocus
               slotProps={{
-                input: {
-                  startAdornment: (
-                    <InputAdornment position="start">
-                      <Mail className="w-4 h-4 text-ink-300" />
-                    </InputAdornment>
-                  ),
-                },
+              input: {
+                startAdornment: (
+                <InputAdornment position="start">
+                  <Mail className="w-4 h-4 text-ink-300" />
+                </InputAdornment>
+                ),
+              },
               }}
             />
 
@@ -253,41 +249,42 @@ export default function LoginPage() {
               onChange={(e) => setPassword(e.target.value)}
               autoComplete="current-password"
               slotProps={{
-                input: {
-                  startAdornment: (
-                    <InputAdornment position="start">
-                      <Lock className="w-4 h-4 text-ink-300" />
-                    </InputAdornment>
-                  ),
-                  endAdornment: (
-                    <InputAdornment position="end">
-                      <IconButton
-                        size="small"
-                        onClick={() => setShowPassword(!showPassword)}
-                        edge="end"
-                      >
-                        {showPassword ? (
-                          <EyeOff className="w-4 h-4" />
-                        ) : (
-                          <Eye className="w-4 h-4" />
-                        )}
-                      </IconButton>
-                    </InputAdornment>
-                  ),
-                },
+              input: {
+                startAdornment: (
+                <InputAdornment position="start">
+                  <Lock className="w-4 h-4 text-ink-300" />
+                </InputAdornment>
+                ),
+                endAdornment: (
+                <InputAdornment position="end">
+                  <IconButton
+                  size="small"
+                  onClick={() => setShowPassword(!showPassword)}
+                  edge="end"
+                  >
+                  {showPassword ? (
+                    <EyeOff className="w-4 h-4" />
+                  ) : (
+                    <Eye className="w-4 h-4" />
+                  )}
+                  </IconButton>
+                </InputAdornment>
+                ),
+              },
               }}
             />
 
             <FormControlLabel
               control={
-                <Checkbox
-                  checked={rememberMe}
-                  onChange={(e) => setRememberMe(e.target.checked)}
-                  size="small"
-                />
+              <Checkbox
+                checked={rememberMe}
+                onChange={(e) => setRememberMe(e.target.checked)}
+                size="small"
+              />
               }
               label="Remember me"
               slotProps={{ typography: { className: "text-sm text-ink-700" } }}
+              className="mt-[-8px]"
             />
 
             <Button
@@ -297,19 +294,20 @@ export default function LoginPage() {
               size="large"
               disabled={loading}
               sx={{
-                py: 1.5,
-                textTransform: "none",
-                fontWeight: 600,
-                fontSize: "1rem",
+              mt: 2,
+              py: 1.5,
+              textTransform: "none",
+              fontWeight: 600,
+              fontSize: "1rem",
               }}
             >
               {loading ? (
-                <CircularProgress size={22} color="inherit" />
+              <CircularProgress size={22} color="inherit" />
               ) : (
-                "Sign in"
+              "Sign in"
               )}
             </Button>
-          </form>
+            </form>
 
           <p className="text-center text-sm text-ink-700 mt-6">
             Don't have an account?{" "}

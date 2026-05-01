@@ -29,6 +29,7 @@ export type AdminUser = {
   last_name: string;
   role: string;
   phone?: string | null;
+  avatar_url?: string | null;
   created_at: string;
   is_active: boolean;
   plant_name?: string | null;
@@ -54,6 +55,7 @@ export type UpdateUserPayload = {
   last_name?: string;
   email?: string;
   phone?: string;
+  password?: string;
   role?: string;
   is_active?: boolean;
   plant_id?: number | null;
@@ -65,6 +67,7 @@ export type AdminCustomer = {
   email: string;
   first_name: string;
   last_name: string;
+  avatar_url?: string | null;
   customer_type: string;
   balance: number;
   daily_consumed: number;
@@ -77,6 +80,8 @@ export type AdminOrder = {
   status: string;
   total_litres: number;
   total_price: number;
+  unit_price?: number | null;
+  daily_litre_limit?: number | null;
   cane_count: number;
   created_at: string;
 };
@@ -135,6 +140,8 @@ export type PriceRow = {
   unit_price: number;
   is_active: boolean;
   timestamp: string;
+  created_at: string;
+  updated_at: string;
   deleted_at?: string | null;
 };
 
@@ -143,16 +150,21 @@ export type LimitRow = {
   daily_litre_limit: number;
   is_active: boolean;
   timestamp: string;
+  created_at: string;
+  updated_at: string;
   deleted_at?: string | null;
 };
 
 export type CustomerTypeRow = {
   id: number;
   name: string;
+  description: string;
   price_id: number;
   limit_id: number;
   unit_price: number;
   daily_litre_limit: number;
+  created_at: string;
+  updated_at: string;
   deleted_at?: string | null;
 };
 
@@ -204,8 +216,14 @@ export const getAdminCustomers = () =>
 // Orders
 // ---------------------------------------------------------------------------
 
-export const getAdminOrders = (status?: string) =>
-  api.get<AdminOrder[]>("/api/admin/orders", { params: status ? { status } : {} }).then((r) => r.data);
+export const getAdminOrders = (status?: string, dateFrom?: string, dateTo?: string) =>
+  api.get<AdminOrder[]>("/api/admin/orders", {
+    params: {
+      ...(status ? { status } : {}),
+      ...(dateFrom ? { date_from: dateFrom } : {}),
+      ...(dateTo ? { date_to: dateTo } : {}),
+    },
+  }).then((r) => r.data);
 
 // ---------------------------------------------------------------------------
 // Plants
@@ -267,7 +285,7 @@ export const getAdminTransactions = (userId?: number) =>
 export const getCustomerTypes = () =>
   api.get<CustomerTypeRow[]>("/api/admin/customer-types").then((r) => r.data);
 
-export const createCustomerType = (data: { name: string; price_id: number; limit_id: number }) =>
+export const createCustomerType = (data: { name: string; description?: string; price_id: number; limit_id: number }) =>
   api.post("/api/admin/customer-types", data).then((r) => r.data);
 
 export const updateCustomerType = (id: number, data: Record<string, unknown>) =>

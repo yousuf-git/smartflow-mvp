@@ -10,9 +10,7 @@ export default defineConfig({
     VitePWA({
       registerType: "autoUpdate",
       includeAssets: [
-        "icons/icon-192.png",
-        "icons/icon-512.png",
-        "icons/icon-192.svg",
+        "icons/smartflow-mark.svg",
       ],
       manifest: {
         name: "SmartFlow",
@@ -26,20 +24,9 @@ export default defineConfig({
         start_url: "/",
         icons: [
           {
-            src: "/icons/icon-192.png",
-            sizes: "192x192",
-            type: "image/png",
-          },
-          {
-            src: "/icons/icon-512.png",
-            sizes: "512x512",
-            type: "image/png",
-          },
-          {
-            src: "/icons/maskable-512.png",
-            sizes: "512x512",
-            type: "image/png",
-            purpose: "maskable",
+            src: "/icons/smartflow-mark.svg",
+            sizes: "64x64 192x192 512x512",
+            type: "image/svg+xml",
           },
         ],
       },

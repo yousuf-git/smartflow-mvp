@@ -24,6 +24,9 @@ export default function AdminPrices() {
   };
   useEffect(load, []);
 
+  const formatDate = (value: string) =>
+    new Date(value).toLocaleString([], { dateStyle: "medium", timeStyle: "short" });
+
   const openCreate = () => {
     setEditTarget(null);
     setForm({ unit_price: 5, is_active: true });
@@ -80,9 +83,10 @@ export default function AdminPrices() {
                 <tr className="bg-ink-100/30">
                   <th className="text-left px-5 py-3 font-semibold text-ink-700">ID</th>
                   <th className="text-left px-5 py-3 font-semibold text-ink-700">Unit Price</th>
-                  <th className="text-left px-5 py-3 font-semibold text-ink-700">Currency</th>
+                  {/* <th className="text-left px-5 py-3 font-semibold text-ink-700">Currency</th> */}
                   <th className="text-left px-5 py-3 font-semibold text-ink-700">Status</th>
                   <th className="text-left px-5 py-3 font-semibold text-ink-700 hidden md:table-cell">Created</th>
+                  <th className="text-left px-5 py-3 font-semibold text-ink-700 hidden lg:table-cell">Updated</th>
                   <th className="text-right px-5 py-3 font-semibold text-ink-700">Actions</th>
                 </tr>
               </thead>
@@ -91,17 +95,18 @@ export default function AdminPrices() {
                   <tr key={p.id} className="border-t border-ink-100/50 hover:bg-ink-100/20 transition-colors">
                     <td className="px-5 py-3 text-ink-700">{p.id}</td>
                     <td className="px-5 py-3 font-medium text-ink-900">Rs. {p.unit_price}/L</td>
-                    <td className="px-5 py-3 text-ink-700">{p.currency}</td>
+                    {/* <td className="px-5 py-3 text-ink-700">{p.currency}</td> */}
                     <td className="px-5 py-3">
                       <Chip label={p.is_active ? "Active" : "Inactive"} size="small" color={p.is_active ? "success" : "default"} variant="outlined" sx={{ fontSize: "0.7rem" }} />
                     </td>
-                    <td className="px-5 py-3 text-ink-300 hidden md:table-cell">{new Date(p.timestamp).toLocaleDateString()}</td>
+                    <td className="px-5 py-3 text-ink-300 hidden md:table-cell">{formatDate(p.created_at)}</td>
+                    <td className="px-5 py-3 text-ink-300 hidden lg:table-cell">{formatDate(p.updated_at)}</td>
                     <td className="px-5 py-3 text-right">
                       <Tooltip title="Edit"><IconButton size="small" onClick={() => openEdit(p)}><Pencil className="w-4 h-4 text-ink-300" /></IconButton></Tooltip>
                     </td>
                   </tr>
                 ))}
-                {prices.length === 0 && <tr><td colSpan={6} className="px-5 py-10 text-center text-ink-300">No prices.</td></tr>}
+                {prices.length === 0 && <tr><td colSpan={7} className="px-5 py-10 text-center text-ink-300">No prices.</td></tr>}
               </tbody>
             </table>
           </div>

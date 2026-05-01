@@ -7,7 +7,7 @@ import {
   type ReactNode,
 } from "react";
 import { useNavigate } from "react-router-dom";
-import { api } from "../lib/api";
+import { api, clearStoredToken, getStoredToken } from "../lib/api";
 
 export type AuthUser = {
   id: number;
@@ -16,6 +16,7 @@ export type AuthUser = {
   last_name: string;
   role: "admin" | "manager" | "customer";
   phone?: string | null;
+  avatar_url?: string | null;
 };
 
 type AuthContextValue = {
@@ -24,6 +25,7 @@ type AuthContextValue = {
   isLoading: boolean;
   login: (email: string, password: string, rememberMe?: boolean) => Promise<void>;
   logout: () => void;
+  setUser: (user: AuthUser) => void;
 };
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -37,7 +39,7 @@ const ROLE_REDIRECTS: Record<string, string> = {
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [token, setToken] = useState<string | null>(
-    () => localStorage.getItem("sf_token"),
+    () => getStoredToken(),
   );
   const [isLoading, setIsLoading] = useState(true);
   const navigate = useNavigate();
@@ -51,7 +53,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       .get<AuthUser>("/api/auth/me")
       .then(({ data }) => setUser(data))
       .catch(() => {
-        localStorage.removeItem("sf_token");
+        clearStoredToken(token);
         setToken(null);
       })
       .finally(() => setIsLoading(false));
@@ -63,7 +65,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         "/api/auth/login",
         { email, password, remember_me: rememberMe },
       );
-      localStorage.setItem("sf_token", data.token);
+      sessionStorage.setItem("sf_token", data.token);
+      if (rememberMe) {
+        localStorage.setItem("sf_remember_token", data.token);
+      } else {
+        localStorage.removeItem("sf_remember_token");
+      }
       setToken(data.token);
       setUser(data.user);
       navigate(ROLE_REDIRECTS[data.user.role] ?? "/");
@@ -72,14 +79,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   );
 
   const logout = useCallback(() => {
-    localStorage.removeItem("sf_token");
+    clearStoredToken(token);
     setToken(null);
     setUser(null);
     navigate("/login");
-  }, [navigate]);
+  }, [navigate, token]);
 
   return (
-    <AuthContext.Provider value={{ user, token, isLoading, login, logout }}>
+    <AuthContext.Provider value={{ user, token, isLoading, login, logout, setUser }}>
       {children}
     </AuthContext.Provider>
   );

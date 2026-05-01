@@ -24,6 +24,9 @@ export default function AdminLimits() {
   };
   useEffect(load, []);
 
+  const formatDate = (value: string) =>
+    new Date(value).toLocaleString([], { dateStyle: "medium", timeStyle: "short" });
+
   const openCreate = () => {
     setEditTarget(null);
     setForm({ daily_litre_limit: 50, is_active: true });
@@ -82,6 +85,7 @@ export default function AdminLimits() {
                   <th className="text-left px-5 py-3 font-semibold text-ink-700">Daily Limit</th>
                   <th className="text-left px-5 py-3 font-semibold text-ink-700">Status</th>
                   <th className="text-left px-5 py-3 font-semibold text-ink-700 hidden md:table-cell">Created</th>
+                  <th className="text-left px-5 py-3 font-semibold text-ink-700 hidden lg:table-cell">Updated</th>
                   <th className="text-right px-5 py-3 font-semibold text-ink-700">Actions</th>
                 </tr>
               </thead>
@@ -93,13 +97,14 @@ export default function AdminLimits() {
                     <td className="px-5 py-3">
                       <Chip label={l.is_active ? "Active" : "Inactive"} size="small" color={l.is_active ? "success" : "default"} variant="outlined" sx={{ fontSize: "0.7rem" }} />
                     </td>
-                    <td className="px-5 py-3 text-ink-300 hidden md:table-cell">{new Date(l.timestamp).toLocaleDateString()}</td>
+                    <td className="px-5 py-3 text-ink-300 hidden md:table-cell">{formatDate(l.created_at)}</td>
+                    <td className="px-5 py-3 text-ink-300 hidden lg:table-cell">{formatDate(l.updated_at)}</td>
                     <td className="px-5 py-3 text-right">
                       <Tooltip title="Edit"><IconButton size="small" onClick={() => openEdit(l)}><Pencil className="w-4 h-4 text-ink-300" /></IconButton></Tooltip>
                     </td>
                   </tr>
                 ))}
-                {limits.length === 0 && <tr><td colSpan={5} className="px-5 py-10 text-center text-ink-300">No limits.</td></tr>}
+                {limits.length === 0 && <tr><td colSpan={6} className="px-5 py-10 text-center text-ink-300">No limits.</td></tr>}
               </tbody>
             </table>
           </div>

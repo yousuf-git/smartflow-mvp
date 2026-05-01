@@ -17,8 +17,9 @@ import {
   InputAdornment,
   IconButton,
   Tooltip,
+  Avatar,
 } from "@mui/material";
-import { UserPlus, Search, Pencil, Trash2 } from "lucide-react";
+import { UserPlus, Search, Pencil, Trash2, Wand2 } from "lucide-react";
 import {
   getAdminUsers,
   createUser,
@@ -31,6 +32,7 @@ import {
   type CustomerTypeRow,
 } from "../../lib/adminApi";
 import { useGlobalToast } from "../../contexts/ToastContext";
+import { useAuth } from "../../contexts/AuthContext";
 
 const ROLE_COLORS: Record<string, "primary" | "success" | "default"> = {
   admin: "primary",
@@ -40,6 +42,7 @@ const ROLE_COLORS: Record<string, "primary" | "success" | "default"> = {
 
 export default function AdminUsers() {
   const { showToast } = useGlobalToast();
+  const { user: currentUser } = useAuth();
   const [users, setUsers] = useState<AdminUser[]>([]);
   const [plants, setPlants] = useState<AdminPlant[]>([]);
   const [customerTypes, setCustomerTypes] = useState<CustomerTypeRow[]>([]);
@@ -62,6 +65,7 @@ export default function AdminUsers() {
   const [editUser, setEditUser] = useState<AdminUser | null>(null);
   const [editForm, setEditForm] = useState({
     first_name: "", last_name: "", email: "", phone: "",
+    password: "",
     role: "" as string, is_active: true, plant_id: null as number | null,
     customer_type_id: null as number | null,
   });
@@ -93,6 +97,16 @@ export default function AdminUsers() {
     setFormError("");
   };
 
+  const generatePassword = () => {
+    const alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789!@#$%";
+    const bytes = new Uint32Array(12);
+    crypto.getRandomValues(bytes);
+    return Array.from(bytes, (byte) => alphabet[byte % alphabet.length]).join("");
+  };
+
+  const initials = (u: AdminUser) =>
+    `${u.first_name[0] ?? ""}${u.last_name[0] ?? ""}`.toUpperCase();
+
   const handleCreate = async (e: FormEvent) => {
     e.preventDefault();
     setFormError("");
@@ -121,7 +135,7 @@ export default function AdminUsers() {
     setEditUser(u);
     setEditForm({
       first_name: u.first_name, last_name: u.last_name, email: u.email,
-      phone: u.phone ?? "", role: u.role, is_active: u.is_active,
+      phone: u.phone ?? "", password: "", role: u.role, is_active: u.is_active,
       plant_id: null, customer_type_id: null,
     });
     setFormError("");
@@ -139,6 +153,7 @@ export default function AdminUsers() {
       if (editForm.last_name !== editUser.last_name) payload.last_name = editForm.last_name;
       if (editForm.email !== editUser.email) payload.email = editForm.email;
       if (editForm.phone !== (editUser.phone ?? "")) payload.phone = editForm.phone;
+      if (editForm.password) payload.password = editForm.password;
       if (editForm.role !== editUser.role) payload.role = editForm.role;
       if (editForm.is_active !== editUser.is_active) payload.is_active = editForm.is_active;
       if (editForm.plant_id !== null) payload.plant_id = editForm.plant_id;
@@ -218,7 +233,14 @@ export default function AdminUsers() {
               <tbody>
                 {filtered.map((u) => (
                   <tr key={u.id} className="border-t border-ink-100/50 hover:bg-ink-100/20 transition-colors">
-                    <td className="px-5 py-3 font-medium text-ink-900">{u.first_name} {u.last_name}</td>
+                    <td className="px-5 py-3">
+                      <div className="flex items-center gap-3">
+                        <Avatar src={u.avatar_url ?? undefined} sx={{ width: 34, height: 34, bgcolor: "#0F8CB0", fontSize: "0.75rem", fontWeight: 700 }}>
+                          {initials(u)}
+                        </Avatar>
+                        <span className="font-medium text-ink-900">{u.first_name} {u.last_name}</span>
+                      </div>
+                    </td>
                     <td className="px-5 py-3 text-ink-700">{u.email}</td>
                     <td className="px-5 py-3">
                       <Chip label={u.role} size="small" color={ROLE_COLORS[u.role] ?? "default"} sx={{ textTransform: "capitalize", fontWeight: 500, fontSize: "0.75rem" }} />
@@ -237,8 +259,16 @@ export default function AdminUsers() {
                         <IconButton size="small" onClick={() => openEdit(u)}><Pencil className="w-4 h-4 text-ink-300" /></IconButton>
                       </Tooltip>
                       {!u.deleted_at && (
-                        <Tooltip title="Delete">
-                          <IconButton size="small" onClick={() => { setDeleteTarget(u); setDeleteOpen(true); }}><Trash2 className="w-4 h-4 text-red-400" /></IconButton>
+                        <Tooltip title={u.id === currentUser?.id ? "You cannot delete yourself" : "Delete"}>
+                          <span>
+                            <IconButton
+                              size="small"
+                              disabled={u.id === currentUser?.id}
+                              onClick={() => { setDeleteTarget(u); setDeleteOpen(true); }}
+                            >
+                              <Trash2 className={`w-4 h-4 ${u.id === currentUser?.id ? "text-ink-200" : "text-red-400"}`} />
+                            </IconButton>
+                          </span>
                         </Tooltip>
                       )}
                     </td>
@@ -263,7 +293,28 @@ export default function AdminUsers() {
             </div>
             <TextField label="Email" type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} required fullWidth size="small" />
             <TextField label="Phone" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} fullWidth size="small" />
-            <TextField label="Password" type="password" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} required fullWidth size="small" />
+            <TextField
+              label="Password"
+              type="text"
+              value={form.password}
+              onChange={(e) => setForm({ ...form, password: e.target.value })}
+              required
+              fullWidth
+              size="small"
+              slotProps={{
+                input: {
+                  endAdornment: (
+                    <InputAdornment position="end">
+                      <Tooltip title="Generate password">
+                        <IconButton edge="end" onClick={() => setForm({ ...form, password: generatePassword() })}>
+                          <Wand2 className="w-4 h-4" />
+                        </IconButton>
+                      </Tooltip>
+                    </InputAdornment>
+                  ),
+                },
+              }}
+            />
             <FormControl fullWidth size="small">
               <InputLabel>Role</InputLabel>
               <Select label="Role" value={form.role} onChange={(e) => setForm({ ...form, role: e.target.value as "admin" | "manager" | "customer" })}>
@@ -313,6 +364,28 @@ export default function AdminUsers() {
             </div>
             <TextField label="Email" type="email" value={editForm.email} onChange={(e) => setEditForm({ ...editForm, email: e.target.value })} required fullWidth size="small" />
             <TextField label="Phone" value={editForm.phone} onChange={(e) => setEditForm({ ...editForm, phone: e.target.value })} fullWidth size="small" />
+            <TextField
+              label="Reset Password"
+              type="text"
+              value={editForm.password}
+              onChange={(e) => setEditForm({ ...editForm, password: e.target.value })}
+              fullWidth
+              size="small"
+              placeholder="Leave blank to keep current password"
+              slotProps={{
+                input: {
+                  endAdornment: (
+                    <InputAdornment position="end">
+                      <Tooltip title="Generate password">
+                        <IconButton edge="end" onClick={() => setEditForm({ ...editForm, password: generatePassword() })}>
+                          <Wand2 className="w-4 h-4" />
+                        </IconButton>
+                      </Tooltip>
+                    </InputAdornment>
+                  ),
+                },
+              }}
+            />
             <FormControl fullWidth size="small">
               <InputLabel>Role</InputLabel>
               <Select label="Role" value={editForm.role} onChange={(e) => setEditForm({ ...editForm, role: e.target.value })}>
@@ -323,7 +396,12 @@ export default function AdminUsers() {
             </FormControl>
             <FormControl fullWidth size="small">
               <InputLabel>Status</InputLabel>
-              <Select label="Status" value={editForm.is_active ? "active" : "inactive"} onChange={(e) => setEditForm({ ...editForm, is_active: e.target.value === "active" })}>
+              <Select
+                label="Status"
+                value={editForm.is_active ? "active" : "inactive"}
+                disabled={editUser?.id === currentUser?.id}
+                onChange={(e) => setEditForm({ ...editForm, is_active: e.target.value === "active" })}
+              >
                 <MenuItem value="active">Active</MenuItem>
                 <MenuItem value="inactive">Inactive</MenuItem>
               </Select>

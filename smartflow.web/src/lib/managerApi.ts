@@ -19,8 +19,14 @@ export const getManagerDashboard = () =>
 export const getManagerPlant = () =>
   api.get<AdminPlant>("/api/manager/plant").then((r) => r.data);
 
-export const getManagerOrders = (status?: string) =>
-  api.get<AdminOrder[]>("/api/manager/orders", { params: status ? { status } : {} }).then((r) => r.data);
+export const getManagerOrders = (status?: string, dateFrom?: string, dateTo?: string) =>
+  api.get<AdminOrder[]>("/api/manager/orders", {
+    params: {
+      ...(status ? { status } : {}),
+      ...(dateFrom ? { date_from: dateFrom } : {}),
+      ...(dateTo ? { date_to: dateTo } : {}),
+    },
+  }).then((r) => r.data);
 
 export const getManagerCustomers = () =>
   api.get<AdminCustomer[]>("/api/manager/customers").then((r) => r.data);

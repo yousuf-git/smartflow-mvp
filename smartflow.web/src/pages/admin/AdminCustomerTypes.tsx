@@ -22,9 +22,12 @@ export default function AdminCustomerTypes() {
   const [editTarget, setEditTarget] = useState<CustomerTypeRow | null>(null);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<CustomerTypeRow | null>(null);
-  const [form, setForm] = useState({ name: "", price_id: 0, limit_id: 0 });
+  const [form, setForm] = useState({ name: "", description: "", price_id: 0, limit_id: 0 });
   const [formError, setFormError] = useState("");
   const [submitting, setSubmitting] = useState(false);
+
+  const formatDate = (value: string) =>
+    new Date(value).toLocaleString([], { dateStyle: "medium", timeStyle: "short" });
 
   const load = () => {
     setLoading(true);
@@ -37,14 +40,14 @@ export default function AdminCustomerTypes() {
 
   const openCreate = () => {
     setEditTarget(null);
-    setForm({ name: "", price_id: prices[0]?.id ?? 0, limit_id: limits[0]?.id ?? 0 });
+    setForm({ name: "", description: "", price_id: prices[0]?.id ?? 0, limit_id: limits[0]?.id ?? 0 });
     setFormError("");
     setDialogOpen(true);
   };
 
   const openEdit = (ct: CustomerTypeRow) => {
     setEditTarget(ct);
-    setForm({ name: ct.name, price_id: ct.price_id, limit_id: ct.limit_id });
+    setForm({ name: ct.name, description: ct.description ?? "", price_id: ct.price_id, limit_id: ct.limit_id });
     setFormError("");
     setDialogOpen(true);
   };
@@ -105,9 +108,12 @@ export default function AdminCustomerTypes() {
               <thead>
                 <tr className="bg-ink-100/30">
                   <th className="text-left px-5 py-3 font-semibold text-ink-700">Name</th>
+                  <th className="text-left px-5 py-3 font-semibold text-ink-700">Description</th>
                   <th className="text-left px-5 py-3 font-semibold text-ink-700">Unit Price</th>
                   <th className="text-left px-5 py-3 font-semibold text-ink-700">Daily Limit</th>
                   <th className="text-left px-5 py-3 font-semibold text-ink-700">Status</th>
+                  <th className="text-left px-5 py-3 font-semibold text-ink-700 hidden xl:table-cell">Created</th>
+                  <th className="text-left px-5 py-3 font-semibold text-ink-700 hidden xl:table-cell">Updated</th>
                   <th className="text-right px-5 py-3 font-semibold text-ink-700">Actions</th>
                 </tr>
               </thead>
@@ -115,11 +121,14 @@ export default function AdminCustomerTypes() {
                 {types.map((ct) => (
                   <tr key={ct.id} className="border-t border-ink-100/50 hover:bg-ink-100/20 transition-colors">
                     <td className="px-5 py-3 font-medium text-ink-900 capitalize">{ct.name}</td>
+                    <td className="px-5 py-3 text-ink-700 min-w-[220px]">{ct.description || "No description"}</td>
                     <td className="px-5 py-3 text-ink-700">Rs. {ct.unit_price}/L</td>
                     <td className="px-5 py-3 text-ink-700">{ct.daily_litre_limit} L/day</td>
                     <td className="px-5 py-3">
                       <Chip label={ct.deleted_at ? "Deleted" : "Active"} size="small" color={ct.deleted_at ? "error" : "success"} variant="outlined" sx={{ fontSize: "0.7rem" }} />
                     </td>
+                    <td className="px-5 py-3 text-ink-300 hidden xl:table-cell">{formatDate(ct.created_at)}</td>
+                    <td className="px-5 py-3 text-ink-300 hidden xl:table-cell">{formatDate(ct.updated_at)}</td>
                     <td className="px-5 py-3 text-right">
                       <Tooltip title="Edit"><IconButton size="small" onClick={() => openEdit(ct)}><Pencil className="w-4 h-4 text-ink-300" /></IconButton></Tooltip>
                       {!ct.deleted_at && (
@@ -128,7 +137,7 @@ export default function AdminCustomerTypes() {
                     </td>
                   </tr>
                 ))}
-                {types.length === 0 && <tr><td colSpan={5} className="px-5 py-10 text-center text-ink-300">No customer types.</td></tr>}
+                {types.length === 0 && <tr><td colSpan={8} className="px-5 py-10 text-center text-ink-300">No customer types.</td></tr>}
               </tbody>
             </table>
           </div>
@@ -142,6 +151,7 @@ export default function AdminCustomerTypes() {
           <DialogContent className="!space-y-4 !pt-2">
             {formError && <Alert severity="error">{formError}</Alert>}
             <TextField label="Name" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required fullWidth size="small" />
+            <TextField label="Description" value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} required fullWidth multiline minRows={3} size="small" />
             <FormControl fullWidth size="small">
               <InputLabel>Price</InputLabel>
               <Select label="Price" value={form.price_id || ""} onChange={(e) => setForm({ ...form, price_id: Number(e.target.value) })}>

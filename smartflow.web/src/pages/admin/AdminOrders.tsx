@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Paper, Chip, Skeleton } from "@mui/material";
+import { Paper, Chip, Skeleton, TextField, Button } from "@mui/material";
 import { getAdminOrders, type AdminOrder } from "../../lib/adminApi";
 
 const STATUS_COLORS: Record<string, "primary" | "success" | "default" | "error"> = {
@@ -12,33 +12,44 @@ export default function AdminOrders() {
   const [orders, setOrders] = useState<AdminOrder[]>([]);
   const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState("");
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState("");
 
   useEffect(() => {
     setLoading(true);
-    getAdminOrders(statusFilter || undefined)
+    getAdminOrders(statusFilter || undefined, dateFrom || undefined, dateTo || undefined)
       .then(setOrders)
       .finally(() => setLoading(false));
-  }, [statusFilter]);
+  }, [statusFilter, dateFrom, dateTo]);
 
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-xl font-bold text-ink-900 mb-1">Orders</h1>
+        <h1 className="text-xl font-bold text-ink-900 mb-1">Dispense Records</h1>
         <p className="text-sm text-ink-300">All dispense sessions</p>
       </div>
 
-      <div className="flex gap-1.5">
-        {["", "active", "completed", "cancelled"].map((s) => (
-          <Chip
-            key={s}
-            label={s || "All"}
-            size="small"
-            variant={statusFilter === s ? "filled" : "outlined"}
-            color={statusFilter === s ? "primary" : "default"}
-            onClick={() => setStatusFilter(s)}
-            sx={{ textTransform: "capitalize", fontWeight: 500 }}
-          />
-        ))}
+      <div className="flex flex-wrap items-center gap-3">
+        <div className="flex gap-1.5">
+          {["", "active", "completed", "cancelled"].map((s) => (
+            <Chip
+              key={s}
+              label={s || "All"}
+              size="small"
+              variant={statusFilter === s ? "filled" : "outlined"}
+              color={statusFilter === s ? "primary" : "default"}
+              onClick={() => setStatusFilter(s)}
+              sx={{ textTransform: "capitalize", fontWeight: 500 }}
+            />
+          ))}
+        </div>
+        <TextField label="From" type="date" size="small" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} slotProps={{ inputLabel: { shrink: true } }} />
+        <TextField label="To" type="date" size="small" value={dateTo} onChange={(e) => setDateTo(e.target.value)} slotProps={{ inputLabel: { shrink: true } }} />
+        {(dateFrom || dateTo) && (
+          <Button size="small" onClick={() => { setDateFrom(""); setDateTo(""); }} sx={{ textTransform: "none" }}>
+            Clear dates
+          </Button>
+        )}
       </div>
 
       <Paper
@@ -56,12 +67,13 @@ export default function AdminOrders() {
             <table className="w-full text-sm">
               <thead>
                 <tr className="bg-ink-100/30">
-                  <th className="text-left px-5 py-3 font-semibold text-ink-700">Order ID</th>
+                  <th className="text-left px-5 py-3 font-semibold text-ink-700">Record ID</th>
                   <th className="text-left px-5 py-3 font-semibold text-ink-700">Customer</th>
                   <th className="text-left px-5 py-3 font-semibold text-ink-700 hidden sm:table-cell">Plant</th>
                   <th className="text-left px-5 py-3 font-semibold text-ink-700">Status</th>
                   <th className="text-right px-5 py-3 font-semibold text-ink-700">Litres</th>
                   <th className="text-right px-5 py-3 font-semibold text-ink-700 hidden md:table-cell">Cost</th>
+                  <th className="text-left px-5 py-3 font-semibold text-ink-700 hidden xl:table-cell">Rate / Limit</th>
                   <th className="text-left px-5 py-3 font-semibold text-ink-700 hidden lg:table-cell">Date</th>
                 </tr>
               </thead>
@@ -90,6 +102,10 @@ export default function AdminOrders() {
                     <td className="px-5 py-3 text-right text-ink-700 hidden md:table-cell">
                       PKR {o.total_price.toFixed(2)}
                     </td>
+                    <td className="px-5 py-3 text-ink-700 hidden xl:table-cell">
+                      {o.unit_price != null ? `Rs. ${o.unit_price.toFixed(0)}/L` : "—"}
+                      {o.daily_litre_limit != null && <span className="text-ink-300"> · {o.daily_litre_limit.toFixed(0)} L/day</span>}
+                    </td>
                     <td className="px-5 py-3 text-ink-300 hidden lg:table-cell">
                       {new Date(o.created_at).toLocaleString()}
                     </td>
@@ -97,8 +113,8 @@ export default function AdminOrders() {
                 ))}
                 {orders.length === 0 && (
                   <tr>
-                    <td colSpan={7} className="px-5 py-10 text-center text-ink-300">
-                      No orders found.
+                    <td colSpan={8} className="px-5 py-10 text-center text-ink-300">
+                      No dispense records found.
                     </td>
                   </tr>
                 )}

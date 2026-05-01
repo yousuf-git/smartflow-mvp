@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
-import { Paper, CircularProgress, Chip, TextField, InputAdornment } from "@mui/material";
-import { MapPin, Search, Clock, Droplets } from "lucide-react";
+import { Paper, CircularProgress, Chip, TextField, InputAdornment, Button, Dialog, DialogTitle, DialogContent, IconButton } from "@mui/material";
+import { MapPin, Search, Clock, Droplets, CalendarDays, X } from "lucide-react";
+import MobilePageHeader from "../../components/MobilePageHeader";
 import {
   getCustomerPlants,
   type CustomerPlant,
@@ -12,6 +13,7 @@ export default function CustomerPlants() {
   const [plants, setPlants] = useState<CustomerPlant[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
+  const [schedulePlant, setSchedulePlant] = useState<CustomerPlant | null>(null);
 
   useEffect(() => {
     getCustomerPlants()
@@ -35,7 +37,7 @@ export default function CustomerPlants() {
 
   return (
     <div className="px-4 pt-6">
-      <h1 className="text-xl font-bold text-ink-900 mb-4">Water Plants</h1>
+      <MobilePageHeader icon={MapPin} title="Water Plants" subtitle="Find an available tap" />
 
       <TextField
         fullWidth
@@ -127,29 +129,60 @@ export default function CustomerPlants() {
               {/* Operating Hours */}
               {plant.operating_hours.length > 0 && (
                 <div className="px-4 pb-4">
-                  <div className="flex items-center gap-1.5 text-xs font-medium text-slate-500 mb-2">
-                    <Clock className="w-3.5 h-3.5" />
-                    <span>Operating Hours</span>
-                  </div>
-                  <div className="grid grid-cols-7 gap-1">
-                    {plant.operating_hours.map((h) => (
-                      <div
-                        key={`${h.day_of_week}-${h.opening_time}`}
-                        className={`text-center py-1.5 rounded-lg text-[10px] ${
-                          h.is_closed ? "bg-slate-50 text-slate-400" : "bg-sky-50 text-sky-700"
-                        }`}
-                      >
-                        <div className="font-semibold">{DAY_NAMES[h.day_of_week]}</div>
-                        {h.is_closed ? <div>Off</div> : <div>{h.opening_time}<br />{h.closing_time}</div>}
-                      </div>
-                    ))}
-                  </div>
+                  <Button
+                    size="small"
+                    variant="outlined"
+                    startIcon={<Clock className="w-3.5 h-3.5" />}
+                    onClick={() => setSchedulePlant(plant)}
+                    sx={{ textTransform: "none", borderRadius: 2 }}
+                  >
+                    View schedule
+                  </Button>
                 </div>
               )}
             </Paper>
           ))}
         </div>
       )}
+
+      <Dialog open={!!schedulePlant} onClose={() => setSchedulePlant(null)} fullWidth maxWidth="xs">
+        <DialogTitle sx={{ fontWeight: 700, pr: 6 }}>
+          {schedulePlant?.name} Schedule
+          <IconButton
+            size="small"
+            onClick={() => setSchedulePlant(null)}
+            sx={{ position: "absolute", right: 12, top: 12 }}
+          >
+            <X className="w-4 h-4" />
+          </IconButton>
+        </DialogTitle>
+        <DialogContent className="!pt-1 !pb-4">
+          <div className="space-y-2">
+            {DAY_NAMES.map((day, dayIndex) => {
+              const slots = schedulePlant?.operating_hours.filter((h) => h.day_of_week === dayIndex) ?? [];
+              return (
+                <div key={day} className="rounded-xl border border-slate-100 p-3">
+                  <div className="flex items-center gap-2 mb-2">
+                    <CalendarDays className="w-4 h-4 text-slate-400" />
+                    <span className="text-sm font-semibold text-ink-900">{day}</span>
+                  </div>
+                  {slots.length === 0 ? (
+                    <p className="text-xs text-slate-400">No schedule set</p>
+                  ) : (
+                    <div className="space-y-1">
+                      {slots.map((slot) => (
+                        <div key={`${slot.day_of_week}-${slot.opening_time}-${slot.closing_time}`} className={`rounded-lg px-3 py-2 text-sm ${slot.is_closed ? "bg-slate-50 text-slate-500" : "bg-sky-50 text-sky-700"}`}>
+                          {slot.is_closed ? "Closed" : `${slot.opening_time} - ${slot.closing_time}`}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

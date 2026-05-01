@@ -9,6 +9,7 @@ import {
   MapPin,
 } from "lucide-react";
 import QRCode from "qrcode";
+import StateCityFields from "../../components/StateCityFields";
 import {
   getAdminPlants, createPlant, updatePlant, deletePlant,
   createController, updateController, deleteController,
@@ -19,6 +20,46 @@ import {
 import { useGlobalToast } from "../../contexts/ToastContext";
 
 const DAY_NAMES = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+
+function OperatingHoursGrid({
+  hours,
+  onEdit,
+  onDelete,
+}: {
+  hours: OperatingHour[];
+  onEdit: (hour: OperatingHour) => void;
+  onDelete: (hour: OperatingHour) => void;
+}) {
+  const grouped = DAY_NAMES.map((day, dayIndex) => ({
+    day,
+    slots: hours.filter((hour) => hour.day_of_week === dayIndex),
+  }));
+
+  return (
+    <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3">
+      {grouped.map(({ day, slots }) => (
+        <div key={day} className="rounded-lg border border-ink-100 bg-white p-3">
+          <div className="text-xs font-semibold text-ink-700 mb-2">{day}</div>
+          {slots.length === 0 ? (
+            <div className="text-xs text-ink-300">No slot</div>
+          ) : (
+            <div className="space-y-1.5">
+              {slots.map((slot) => (
+                <div key={slot.id} className={`flex items-center justify-between gap-2 rounded-md px-2 py-1.5 text-xs ${slot.is_closed ? "bg-slate-50 text-slate-500" : "bg-sky-50 text-sky-700"}`}>
+                  <span>{slot.is_closed ? "Closed" : `${slot.opening_time} - ${slot.closing_time}`}</span>
+                  <span className="flex items-center gap-0.5">
+                    <IconButton size="small" onClick={() => onEdit(slot)} sx={{ p: 0.25 }}><Pencil className="w-3 h-3" /></IconButton>
+                    <IconButton size="small" onClick={() => onDelete(slot)} sx={{ p: 0.25 }}><Trash2 className="w-3 h-3 text-red-400" /></IconButton>
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      ))}
+    </div>
+  );
+}
 
 // ---------------------------------------------------------------------------
 // QR Dialog (kept from original)
@@ -360,18 +401,11 @@ export default function AdminPlants() {
               <Button size="small" startIcon={<Plus className="w-3 h-3" />} onClick={() => openCreateOh(plant.id)} sx={{ textTransform: "none", fontSize: "0.75rem" }}>Add Slot</Button>
             </div>
             {plant.operating_hours.length > 0 ? (
-              <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-2">
-                {plant.operating_hours.map((h) => (
-                  <div key={h.id} className={`text-center py-2 px-1 rounded-lg text-xs relative group ${h.is_closed ? "bg-slate-50 text-slate-400" : "bg-sky-50 text-sky-700"}`}>
-                    <div className="font-semibold mb-0.5">{DAY_NAMES[h.day_of_week]}</div>
-                    {h.is_closed ? <div>Closed</div> : <div>{h.opening_time}<br />{h.closing_time}</div>}
-                    <div className="absolute top-0.5 right-0.5 hidden group-hover:flex gap-0.5">
-                      <IconButton size="small" onClick={() => openEditOh(h, plant.id)} sx={{ p: 0.3 }}><Pencil className="w-3 h-3" /></IconButton>
-                      <IconButton size="small" onClick={() => setDeleteDialog({ type: "hour", id: h.id, label: DAY_NAMES[h.day_of_week] })} sx={{ p: 0.3 }}><Trash2 className="w-3 h-3 text-red-400" /></IconButton>
-                    </div>
-                  </div>
-                ))}
-              </div>
+              <OperatingHoursGrid
+                hours={plant.operating_hours}
+                onEdit={(hour) => openEditOh(hour, plant.id)}
+                onDelete={(hour) => setDeleteDialog({ type: "hour", id: hour.id, label: `${DAY_NAMES[hour.day_of_week]} slot` })}
+              />
             ) : (
               <p className="text-sm text-ink-300">No schedule configured.</p>
             )}
@@ -393,14 +427,13 @@ export default function AdminPlants() {
           <DialogContent className="!space-y-4 !pt-2">
             {plantError && <Alert severity="error">{plantError}</Alert>}
             <TextField label="Name" value={plantForm.name} onChange={(e) => setPlantForm({ ...plantForm, name: e.target.value })} required fullWidth size="small" />
-            <div className="grid grid-cols-2 gap-3">
-              <TextField label="City" value={plantForm.city} onChange={(e) => setPlantForm({ ...plantForm, city: e.target.value })} size="small" />
-              <TextField label="Province" value={plantForm.province} onChange={(e) => setPlantForm({ ...plantForm, province: e.target.value })} size="small" />
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              <TextField label="Area" value={plantForm.area} onChange={(e) => setPlantForm({ ...plantForm, area: e.target.value })} size="small" />
-              <TextField label="Address" value={plantForm.address} onChange={(e) => setPlantForm({ ...plantForm, address: e.target.value })} size="small" />
-            </div>
+            <StateCityFields
+              stateName={plantForm.province}
+              cityName={plantForm.city}
+              onChange={({ stateName, cityName }) => setPlantForm({ ...plantForm, province: stateName, city: cityName })}
+            />
+            <TextField label="Area" value={plantForm.area} onChange={(e) => setPlantForm({ ...plantForm, area: e.target.value })} fullWidth size="small" />
+            <TextField label="Address" value={plantForm.address} onChange={(e) => setPlantForm({ ...plantForm, address: e.target.value })} fullWidth size="small" />
             <FormControl fullWidth size="small">
               <InputLabel>Status</InputLabel>
               <Select label="Status" value={plantForm.status} onChange={(e) => setPlantForm({ ...plantForm, status: e.target.value })}>

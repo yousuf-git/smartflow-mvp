@@ -1,12 +1,12 @@
 import { Outlet, useLocation, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
-import { Home, MapPin, QrCode, Receipt, User } from "lucide-react";
+import { History, Home, MapPin, QrCode, User } from "lucide-react";
 
 const navItems = [
   { path: "/app", icon: Home, label: "Home" },
   { path: "/app/plants", icon: MapPin, label: "Plants" },
   { path: "/app/scan", icon: QrCode, label: "Scan" },
-  { path: "/app/transactions", icon: Receipt, label: "History" },
+  { path: "/app/transactions", icon: History, label: "History" },
   { path: "/app/profile", icon: User, label: "Profile" },
 ];
 

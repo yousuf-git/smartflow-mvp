@@ -16,6 +16,46 @@ import { useGlobalToast } from "../../contexts/ToastContext";
 
 const DAY_NAMES = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
+function OperatingHoursGrid({
+  hours,
+  onEdit,
+  onDelete,
+}: {
+  hours: OperatingHour[];
+  onEdit: (hour: OperatingHour) => void;
+  onDelete: (hour: OperatingHour) => void;
+}) {
+  const grouped = DAY_NAMES.map((day, dayIndex) => ({
+    day,
+    slots: hours.filter((hour) => hour.day_of_week === dayIndex),
+  }));
+
+  return (
+    <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3">
+      {grouped.map(({ day, slots }) => (
+        <div key={day} className="rounded-lg border border-ink-100 bg-white p-3">
+          <div className="text-xs font-semibold text-ink-700 mb-2">{day}</div>
+          {slots.length === 0 ? (
+            <div className="text-xs text-ink-300">No slot</div>
+          ) : (
+            <div className="space-y-1.5">
+              {slots.map((slot) => (
+                <div key={slot.id} className={`flex items-center justify-between gap-2 rounded-md px-2 py-1.5 text-xs ${slot.is_closed ? "bg-slate-50 text-slate-500" : "bg-sky-50 text-sky-700"}`}>
+                  <span>{slot.is_closed ? "Closed" : `${slot.opening_time} - ${slot.closing_time}`}</span>
+                  <span className="flex items-center gap-0.5">
+                    <IconButton size="small" onClick={() => onEdit(slot)} sx={{ p: 0.25 }}><Pencil className="w-3 h-3" /></IconButton>
+                    <IconButton size="small" onClick={() => onDelete(slot)} sx={{ p: 0.25 }}><Trash2 className="w-3 h-3 text-red-400" /></IconButton>
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      ))}
+    </div>
+  );
+}
+
 function TapQRDialog({ plant, tap, onClose }: { plant: AdminPlant; tap: AdminPlantTap; onClose: () => void }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   useEffect(() => {
@@ -247,18 +287,11 @@ export default function ManagerPlant() {
             <Button size="small" startIcon={<Plus className="w-3 h-3" />} onClick={openCreateOh} sx={{ textTransform: "none", fontSize: "0.75rem" }}>Add Slot</Button>
           </div>
           {plant.operating_hours.length > 0 ? (
-            <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-2">
-              {plant.operating_hours.map((h) => (
-                <div key={h.id} className={`text-center py-2 px-1 rounded-lg text-xs relative group ${h.is_closed ? "bg-slate-50 text-slate-400" : "bg-sky-50 text-sky-700"}`}>
-                  <div className="font-semibold mb-0.5">{DAY_NAMES[h.day_of_week]}</div>
-                  {h.is_closed ? <div>Closed</div> : <div>{h.opening_time}<br />{h.closing_time}</div>}
-                  <div className="absolute top-0.5 right-0.5 hidden group-hover:flex gap-0.5">
-                    <IconButton size="small" onClick={() => openEditOh(h)} sx={{ p: 0.3 }}><Pencil className="w-3 h-3" /></IconButton>
-                    <IconButton size="small" onClick={() => setDeleteOhTarget(h)} sx={{ p: 0.3 }}><Trash2 className="w-3 h-3 text-red-400" /></IconButton>
-                  </div>
-                </div>
-              ))}
-            </div>
+            <OperatingHoursGrid
+              hours={plant.operating_hours}
+              onEdit={openEditOh}
+              onDelete={setDeleteOhTarget}
+            />
           ) : (
             <p className="text-sm text-ink-300">No schedule configured.</p>
           )}

@@ -95,6 +95,9 @@ export default function AdminDashboard() {
   }
 
   if (!data) return null;
+  const customerTypeData = charts?.customer_types.some((ct) => ct.value > 0)
+    ? charts.customer_types
+    : [{ name: "No customers", value: 1 }];
 
   return (
     <div className="space-y-8">
@@ -111,7 +114,7 @@ export default function AdminDashboard() {
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           <StatCard icon={<Users className="w-5 h-5 text-aqua-600" />} label="Total Users" value={data.total_users} color="#0F8CB0" />
           <StatCard icon={<UsersRound className="w-5 h-5 text-aqua-600" />} label="Customers" value={data.total_customers} color="#0F8CB0" />
-          <StatCard icon={<Receipt className="w-5 h-5" style={{ color: "#3B7A57" }} />} label="Total Orders" value={data.total_orders} color="#3B7A57" />
+          <StatCard icon={<Receipt className="w-5 h-5" style={{ color: "#3B7A57" }} />} label="Total Sessions" value={data.total_orders} color="#3B7A57" />
           <StatCard icon={<DollarSign className="w-5 h-5" style={{ color: "#3B7A57" }} />} label="Total Revenue" value={`Rs. ${data.total_revenue.toFixed(0)}`} color="#3B7A57" />
         </div>
       </div>
@@ -122,7 +125,7 @@ export default function AdminDashboard() {
           Today
         </h2>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          <StatCard icon={<CalendarClock className="w-5 h-5 text-aqua-600" />} label="Today's Orders" value={data.today_orders} color="#0F8CB0" />
+          <StatCard icon={<CalendarClock className="w-5 h-5 text-aqua-600" />} label="Today's Sessions" value={data.today_orders} color="#0F8CB0" />
           <StatCard icon={<TrendingUp className="w-5 h-5" style={{ color: "#3B7A57" }} />} label="Today's Revenue" value={`Rs. ${data.today_revenue.toFixed(0)}`} color="#3B7A57" />
           <StatCard icon={<Droplets className="w-5 h-5 text-aqua-600" />} label="Litres Dispensed" value={`${data.total_litres_dispensed.toFixed(1)} L`} color="#0F8CB0" />
           <StatCard icon={<Activity className="w-5 h-5" style={{ color: "#D97757" }} />} label="Active Sessions" value={data.active_sessions} color="#D97757" />
@@ -148,7 +151,7 @@ export default function AdminDashboard() {
 
           {/* Orders chart */}
           <Paper elevation={0} sx={{ border: "1px solid #EDF0F2", borderRadius: 3 }} className="p-5">
-            <h3 className="text-sm font-semibold text-ink-900 mb-4">Orders (30 days)</h3>
+            <h3 className="text-sm font-semibold text-ink-900 mb-4">Dispense Sessions (30 days)</h3>
             <ResponsiveContainer width="100%" height={220}>
               <BarChart data={charts.orders_chart}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#EDF0F2" />
@@ -166,7 +169,7 @@ export default function AdminDashboard() {
             <ResponsiveContainer width="100%" height={220}>
               <PieChart>
                 <Pie
-                  data={charts.customer_types}
+                  data={customerTypeData}
                   dataKey="value"
                   nameKey="name"
                   cx="50%"
@@ -175,20 +178,20 @@ export default function AdminDashboard() {
                   outerRadius={80}
                   paddingAngle={4}
                 >
-                  {charts.customer_types.map((_, i) => (
-                    <Cell key={i} fill={CHART_COLORS[i % CHART_COLORS.length]} />
+                  {customerTypeData.map((_, i) => (
+                    <Cell key={i} fill={charts.customer_types.some((ct) => ct.value > 0) ? CHART_COLORS[i % CHART_COLORS.length] : "#EDF0F2"} />
                   ))}
                 </Pie>
                 <Tooltip />
               </PieChart>
             </ResponsiveContainer>
             <div className="flex flex-wrap gap-2 mt-2">
-              {charts.customer_types.map((ct, i) => (
+              {charts.customer_types.length > 0 ? charts.customer_types.map((ct, i) => (
                 <div key={ct.name} className="flex items-center gap-1.5 text-xs text-ink-700">
                   <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: CHART_COLORS[i % CHART_COLORS.length] }} />
                   {ct.name} ({ct.value})
                 </div>
-              ))}
+              )) : <div className="text-xs text-ink-300">No customer type data yet</div>}
             </div>
           </Paper>
         </div>

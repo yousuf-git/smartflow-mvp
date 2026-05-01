@@ -4,7 +4,10 @@ import {
   Drawer,
   IconButton,
   Avatar,
-  Button,
+  Menu as MuiMenu,
+  MenuItem,
+  ListItemIcon,
+  Divider,
   useMediaQuery,
 } from "@mui/material";
 import {
@@ -14,12 +17,13 @@ import {
   Droplets,
   Receipt,
   DollarSign,
-  Menu,
+  Menu as MenuIcon,
   LogOut,
   X,
   Tags,
   Gauge,
   ScrollText,
+  UserCog,
   type LucideIcon,
 } from "lucide-react";
 import { useAuth } from "../contexts/AuthContext";
@@ -35,7 +39,7 @@ const ADMIN_NAV: NavItem[] = [
   { path: "/admin/users", label: "Users", icon: Users },
   { path: "/admin/customers", label: "Customers", icon: UsersRound },
   { path: "/admin/plants", label: "Plants", icon: Droplets },
-  { path: "/admin/orders", label: "Orders", icon: Receipt },
+  { path: "/admin/orders", label: "Dispense Records", icon: Receipt },
   { path: "/admin/transactions", label: "Transactions", icon: DollarSign },
   { path: "/admin/customer-types", label: "Customer Types", icon: Tags },
   { path: "/admin/prices", label: "Prices", icon: DollarSign },
@@ -46,7 +50,7 @@ const ADMIN_NAV: NavItem[] = [
 const MANAGER_NAV: NavItem[] = [
   { path: "/manager", label: "Dashboard", icon: LayoutDashboard },
   { path: "/manager/plant", label: "My Plant", icon: Droplets },
-  { path: "/manager/orders", label: "Orders", icon: Receipt },
+  { path: "/manager/orders", label: "Dispense Records", icon: Receipt },
   { path: "/manager/customers", label: "Customers", icon: UsersRound },
 ];
 
@@ -55,6 +59,7 @@ type Props = { role: "admin" | "manager" };
 export default function DashboardLayout({ role }: Props) {
   const { user, logout } = useAuth();
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [profileAnchor, setProfileAnchor] = useState<HTMLElement | null>(null);
   const isDesktop = useMediaQuery("(min-width: 1024px)");
   const location = useLocation();
 
@@ -67,6 +72,10 @@ export default function DashboardLayout({ role }: Props) {
     if (path === `/${role}`) return location.pathname === path;
     return location.pathname.startsWith(path);
   };
+
+  const profilePath = `/${role}/profile`;
+
+  const closeProfileMenu = () => setProfileAnchor(null);
 
   const sidebar = (
     <div className="flex flex-col h-full w-64 bg-white border-r border-ink-100">
@@ -118,8 +127,13 @@ export default function DashboardLayout({ role }: Props) {
 
       {/* User section */}
       <div className="px-4 py-4 border-t border-ink-100">
-        <div className="flex items-center gap-3 mb-3">
+        <button
+          type="button"
+          onClick={(event) => setProfileAnchor(event.currentTarget)}
+          className="mb-3 flex w-full items-center gap-3 rounded-lg px-2 py-2 text-left transition-colors hover:bg-ink-100/50"
+        >
           <Avatar
+            src={user?.avatar_url ?? undefined}
             sx={{
               width: 36,
               height: 36,
@@ -136,23 +150,40 @@ export default function DashboardLayout({ role }: Props) {
             </div>
             <div className="text-xs text-ink-300 truncate">{user?.email}</div>
           </div>
-        </div>
-        <Button
-          onClick={logout}
-          variant="outlined"
-          size="small"
-          fullWidth
-          startIcon={<LogOut className="w-3.5 h-3.5" />}
-          sx={{
-            textTransform: "none",
-            color: "#3A464C",
-            borderColor: "#EDF0F2",
-            fontSize: "0.8rem",
-            "&:hover": { borderColor: "#B9C2C7", bgcolor: "#F6F8F9" },
-          }}
+        </button>
+        <MuiMenu
+          anchorEl={profileAnchor}
+          open={Boolean(profileAnchor)}
+          onClose={closeProfileMenu}
+          anchorOrigin={{ vertical: "top", horizontal: "right" }}
+          transformOrigin={{ vertical: "bottom", horizontal: "right" }}
         >
-          Sign out
-        </Button>
+          <MenuItem
+            component={NavLink}
+            to={profilePath}
+            onClick={() => {
+              closeProfileMenu();
+              setMobileOpen(false);
+            }}
+          >
+            <ListItemIcon>
+              <UserCog className="h-4 w-4" />
+            </ListItemIcon>
+            Profile settings
+          </MenuItem>
+          <Divider />
+          <MenuItem
+            onClick={() => {
+              closeProfileMenu();
+              logout();
+            }}
+          >
+            <ListItemIcon>
+              <LogOut className="h-4 w-4" />
+            </ListItemIcon>
+            Sign out
+          </MenuItem>
+        </MuiMenu>
       </div>
     </div>
   );
@@ -182,7 +213,7 @@ export default function DashboardLayout({ role }: Props) {
               size="small"
               onClick={() => setMobileOpen(true)}
             >
-              <Menu className="w-5 h-5" />
+              <MenuIcon className="w-5 h-5" />
             </IconButton>
             <div className="flex items-center gap-2">
               <Droplets className="w-5 h-5 text-aqua-600" />

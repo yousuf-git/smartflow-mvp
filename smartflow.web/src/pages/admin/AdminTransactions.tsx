@@ -39,7 +39,7 @@ export default function AdminTransactions() {
                   <th className="text-right px-5 py-3 font-semibold text-ink-700">Amount</th>
                   <th className="text-left px-5 py-3 font-semibold text-ink-700">Type</th>
                   <th className="text-left px-5 py-3 font-semibold text-ink-700 hidden sm:table-cell">Date</th>
-                  <th className="text-left px-5 py-3 font-semibold text-ink-700 hidden md:table-cell">Purchase</th>
+                  <th className="text-left px-5 py-3 font-semibold text-ink-700 hidden md:table-cell">Dispense</th>
                 </tr>
               </thead>
               <tbody>

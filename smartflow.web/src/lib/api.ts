@@ -4,8 +4,19 @@ const baseURL = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8000";
 
 export const api = axios.create({ baseURL, timeout: 15_000 });
 
+export function getStoredToken(): string | null {
+  return sessionStorage.getItem("sf_token") ?? localStorage.getItem("sf_remember_token");
+}
+
+export function clearStoredToken(token?: string | null): void {
+  sessionStorage.removeItem("sf_token");
+  if (!token || localStorage.getItem("sf_remember_token") === token) {
+    localStorage.removeItem("sf_remember_token");
+  }
+}
+
 api.interceptors.request.use((config) => {
-  const token = localStorage.getItem("sf_token");
+  const token = getStoredToken();
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
   }
@@ -20,7 +31,7 @@ api.interceptors.response.use(
       const url = err.config?.url ?? "";
 
       if (status === 401 && !url.includes("/api/auth/")) {
-        localStorage.removeItem("sf_token");
+        clearStoredToken(getStoredToken());
         window.location.href = "/login";
       } else if (status && status !== 401) {
         const detail = (err.response?.data as { detail?: unknown })?.detail;

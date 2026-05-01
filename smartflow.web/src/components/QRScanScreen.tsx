@@ -1,7 +1,6 @@
 import { useCallback, useState } from "react";
 import {
   Button,
-  CircularProgress,
   Dialog,
   DialogContent,
   DialogTitle,
@@ -11,9 +10,7 @@ import {
   Typography,
 } from "@mui/material";
 import QrCodeScannerIcon from "@mui/icons-material/QrCodeScanner";
-import PrintOutlinedIcon from "@mui/icons-material/PrintOutlined";
 import CloseIcon from "@mui/icons-material/Close";
-import QRCode from "qrcode";
 import CameraScanner from "./CameraScanner";
 import Toast from "./Toast";
 import { useToast } from "../lib/useToast";
@@ -29,7 +26,6 @@ type Props = {
 
 export default function QRScanScreen({ catalogue, onScanned, onBypass }: Props) {
   const [scanOpen, setScanOpen] = useState(false);
-  const [printing, setPrinting] = useState(false);
   const { toastProps, showToast } = useToast();
 
   const handleResult = useCallback(
@@ -63,63 +59,6 @@ export default function QRScanScreen({ catalogue, onScanned, onBypass }: Props) 
     },
     [showToast],
   );
-
-  const handlePrint = useCallback(async () => {
-    if (!catalogue) return;
-    const plant = catalogue.plants[0];
-    const tap = plant?.taps[0];
-    if (!plant || !tap) return;
-
-    setPrinting(true);
-    try {
-      const payload: QRPayload = { plant_id: plant.id, tap_id: tap.id };
-      const dataUrl = await QRCode.toDataURL(JSON.stringify(payload), {
-        width: 300,
-        margin: 2,
-        color: { dark: "#111718", light: "#ffffff" },
-      });
-
-      const win = window.open("", "_blank", "width=450,height=600");
-      if (!win) {
-        showToast("Popup blocked — allow popups and try again.", "warning");
-        return;
-      }
-      win.document.write(`
-        <!DOCTYPE html>
-        <html>
-          <head>
-            <title>SmartFlow Test QR</title>
-            <style>
-              * { box-sizing: border-box; margin: 0; padding: 0; }
-              body { font-family: -apple-system, sans-serif; text-align: center; padding: 40px 32px; background: #fff; }
-              h2 { font-size: 20px; font-weight: 700; color: #111718; margin-bottom: 4px; }
-              .sub { font-size: 13px; color: #3A464C; margin-bottom: 28px; }
-              img { display: block; margin: 0 auto 20px; border: 1px solid #EDF0F2; border-radius: 8px; padding: 8px; }
-              .meta { font-size: 12px; color: #3A464C; line-height: 1.8; }
-              .payload { font-size: 10px; color: #aaa; margin-top: 8px; font-family: monospace; }
-              @media print { body { padding: 20px; } }
-            </style>
-          </head>
-          <body>
-            <h2>SmartFlow Test QR</h2>
-            <p class="sub">Use this code to test QR scanning</p>
-            <img src="${dataUrl}" width="240" height="240" />
-            <div class="meta">
-              <div><strong>Plant:</strong> ${plant.name} (ID: ${plant.id})</div>
-              <div><strong>Tap:</strong> ${tap.label} (ID: ${tap.id})</div>
-            </div>
-            <div class="payload">${JSON.stringify(payload)}</div>
-            <script>window.onload = function() { window.print(); }<\/script>
-          </body>
-        </html>
-      `);
-      win.document.close();
-    } catch {
-      showToast("Could not generate QR for printing.", "error");
-    } finally {
-      setPrinting(false);
-    }
-  }, [catalogue, showToast]);
 
   return (
     <>
@@ -197,7 +136,7 @@ export default function QRScanScreen({ catalogue, onScanned, onBypass }: Props) 
               Use defaults
             </Button>
 
-            <Button
+            {/* <Button
               variant="text"
               size="small"
               startIcon={printing ? <CircularProgress size={14} /> : <PrintOutlinedIcon />}
@@ -206,7 +145,7 @@ export default function QRScanScreen({ catalogue, onScanned, onBypass }: Props) 
               sx={{ textTransform: "none", color: "text.secondary" }}
             >
               Print test QR
-            </Button>
+            </Button> */}
           </div>
         </div>
       </Paper>

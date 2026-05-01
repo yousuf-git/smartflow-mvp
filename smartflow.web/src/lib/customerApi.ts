@@ -1,4 +1,5 @@
 import { api } from "./api";
+import type { AuthUser } from "../contexts/AuthContext";
 
 export type CustomerDashboard = {
   balance: number;
@@ -61,6 +62,8 @@ export type CustomerPurchase = {
   created_at: string;
 };
 
+export type TopUpMethod = "Jazzcash" | "Easypaisa";
+
 export async function getCustomerDashboard(): Promise<CustomerDashboard> {
   const { data } = await api.get<CustomerDashboard>("/api/customer/dashboard");
   return data;
@@ -78,5 +81,27 @@ export async function getCustomerTransactions(): Promise<CustomerTransaction[]> 
 
 export async function getCustomerPurchases(): Promise<CustomerPurchase[]> {
   const { data } = await api.get<CustomerPurchase[]>("/api/customer/purchases");
+  return data;
+}
+
+export async function topUpWallet(amount: number, method: TopUpMethod): Promise<CustomerTransaction> {
+  const { data } = await api.post<CustomerTransaction>("/api/customer/top-up", { amount, method });
+  return data;
+}
+
+export async function updateCustomerProfile(firstName: string, lastName: string): Promise<AuthUser> {
+  const { data } = await api.put<AuthUser>("/api/customer/profile", {
+    first_name: firstName,
+    last_name: lastName,
+  });
+  return data;
+}
+
+export async function uploadCustomerAvatar(file: Blob): Promise<AuthUser> {
+  const formData = new FormData();
+  formData.append("file", file, "avatar.png");
+  const { data } = await api.post<AuthUser>("/api/customer/profile/avatar", formData, {
+    headers: { "Content-Type": "multipart/form-data" },
+  });
   return data;
 }

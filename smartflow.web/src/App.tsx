@@ -16,6 +16,7 @@ import AdminCustomers from "./pages/admin/AdminCustomers";
 import AdminPlants from "./pages/admin/AdminPlants";
 import AdminOrders from "./pages/admin/AdminOrders";
 import AdminTransactions from "./pages/admin/AdminTransactions";
+import AdminProfile from "./pages/admin/AdminProfile";
 import ManagerDashboard from "./pages/manager/ManagerDashboard";
 import ManagerPlant from "./pages/manager/ManagerPlant";
 import ManagerOrders from "./pages/manager/ManagerOrders";
@@ -25,6 +26,7 @@ import CustomerPlants from "./pages/customer/CustomerPlants";
 import CustomerScan from "./pages/customer/CustomerScan";
 import CustomerTransactions from "./pages/customer/CustomerTransactions";
 import CustomerProfile from "./pages/customer/CustomerProfile";
+import CustomerTopUp from "./pages/customer/CustomerTopUp";
 
 export default function App() {
   return (
@@ -49,6 +51,7 @@ export default function App() {
             <Route path="plants" element={<CustomerPlants />} />
             <Route path="scan" element={<CustomerScan />} />
             <Route path="transactions" element={<CustomerTransactions />} />
+            <Route path="top-up" element={<CustomerTopUp />} />
             <Route path="profile" element={<CustomerProfile />} />
           </Route>
 
@@ -71,6 +74,7 @@ export default function App() {
             <Route path="prices" element={<AdminPrices />} />
             <Route path="limits" element={<AdminLimits />} />
             <Route path="system-logs" element={<AdminSystemLogs />} />
+            <Route path="profile" element={<AdminProfile />} />
           </Route>
 
           {/* Manager */}
@@ -86,6 +90,7 @@ export default function App() {
             <Route path="plant" element={<ManagerPlant />} />
             <Route path="orders" element={<ManagerOrders />} />
             <Route path="customers" element={<ManagerCustomers />} />
+            <Route path="profile" element={<AdminProfile />} />
           </Route>
 
           <Route path="*" element={<Navigate to="/" replace />} />

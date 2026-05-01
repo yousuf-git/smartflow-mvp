@@ -82,7 +82,7 @@ export default function ManagerDashboard() {
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           <StatCard
             icon={<Receipt className="w-5 h-5 text-aqua-600" />}
-            label="Total Orders"
+            label="Total Sessions"
             value={data.total_orders}
             color="#0F8CB0"
           />
@@ -114,7 +114,7 @@ export default function ManagerDashboard() {
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           <StatCard
             icon={<CalendarClock className="w-5 h-5 text-aqua-600" />}
-            label="Today's Orders"
+            label="Today's Sessions"
             value={data.today_orders}
             color="#0F8CB0"
           />

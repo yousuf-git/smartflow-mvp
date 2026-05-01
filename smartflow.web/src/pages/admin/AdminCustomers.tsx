@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Paper, Skeleton } from "@mui/material";
+import { Avatar, Paper, Skeleton } from "@mui/material";
 import { getAdminCustomers, type AdminCustomer } from "../../lib/adminApi";
 
 export default function AdminCustomers() {
@@ -11,6 +11,9 @@ export default function AdminCustomers() {
       .then(setCustomers)
       .finally(() => setLoading(false));
   }, []);
+
+  const initials = (customer: AdminCustomer) =>
+    `${customer.first_name[0] ?? ""}${customer.last_name[0] ?? ""}`.toUpperCase();
 
   return (
     <div className="space-y-6">
@@ -49,8 +52,13 @@ export default function AdminCustomers() {
                     key={c.user_id}
                     className="border-t border-ink-100/50 hover:bg-ink-100/20 transition-colors"
                   >
-                    <td className="px-5 py-3 font-medium text-ink-900">
-                      {c.first_name} {c.last_name}
+                    <td className="px-5 py-3">
+                      <div className="flex items-center gap-3">
+                        <Avatar src={c.avatar_url ?? undefined} sx={{ width: 34, height: 34, bgcolor: "#0F8CB0", fontSize: "0.75rem", fontWeight: 700 }}>
+                          {initials(c)}
+                        </Avatar>
+                        <span className="font-medium text-ink-900">{c.first_name} {c.last_name}</span>
+                      </div>
                     </td>
                     <td className="px-5 py-3 text-ink-700">{c.email}</td>
                     <td className="px-5 py-3 text-ink-700 capitalize">{c.customer_type}</td>
