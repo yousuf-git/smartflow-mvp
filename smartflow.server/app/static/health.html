@@ -1,0 +1,396 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SmartFlow API — Status</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #f8f9fb;
+    --surface: #ffffff;
+    --border: #e5e7eb;
+    --text: #1a1a2e;
+    --text-muted: #6b7280;
+    --accent: #2563eb;
+    --accent-light: #eff6ff;
+    --green: #16a34a;
+    --green-bg: #f0fdf4;
+    --red: #dc2626;
+    --red-bg: #fef2f2;
+    --yellow: #ca8a04;
+    --yellow-bg: #fefce8;
+    --radius: 12px;
+    --shadow: 0 1px 3px rgba(0,0,0,.06), 0 1px 2px rgba(0,0,0,.04);
+    --shadow-lg: 0 4px 12px rgba(0,0,0,.08);
+  }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Inter, Roboto, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 40px 20px;
+    line-height: 1.5;
+  }
+
+  .container { max-width: 720px; width: 100%; }
+
+  /* Header */
+  .header {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    margin-bottom: 32px;
+  }
+  .logo {
+    width: 48px; height: 48px;
+    background: var(--accent);
+    border-radius: 12px;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .logo svg { width: 28px; height: 28px; }
+  .header-text h1 { font-size: 22px; font-weight: 700; letter-spacing: -0.3px; }
+  .header-text p { font-size: 13px; color: var(--text-muted); }
+
+  /* Status banner */
+  .status-banner {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 16px 20px;
+    border-radius: var(--radius);
+    margin-bottom: 24px;
+    font-weight: 600;
+    font-size: 15px;
+    box-shadow: var(--shadow);
+  }
+  .status-banner.operational { background: var(--green-bg); color: var(--green); border: 1px solid #bbf7d0; }
+  .status-banner.degraded    { background: var(--yellow-bg); color: var(--yellow); border: 1px solid #fef08a; }
+  .status-banner.down        { background: var(--red-bg); color: var(--red); border: 1px solid #fecaca; }
+
+  .pulse {
+    width: 10px; height: 10px;
+    border-radius: 50%;
+    position: relative;
+    flex-shrink: 0;
+  }
+  .pulse::before {
+    content: '';
+    position: absolute;
+    inset: -4px;
+    border-radius: 50%;
+    animation: pulse-ring 2s ease-out infinite;
+  }
+  .operational .pulse { background: var(--green); }
+  .operational .pulse::before { border: 2px solid var(--green); }
+  .degraded .pulse { background: var(--yellow); }
+  .degraded .pulse::before { border: 2px solid var(--yellow); }
+  .down .pulse { background: var(--red); }
+  .down .pulse::before { border: 2px solid var(--red); }
+
+  @keyframes pulse-ring {
+    0% { transform: scale(1); opacity: .6; }
+    100% { transform: scale(1.8); opacity: 0; }
+  }
+
+  /* Cards */
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 24px;
+    margin-bottom: 16px;
+    box-shadow: var(--shadow);
+  }
+  .card-title {
+    font-size: 12px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    color: var(--text-muted);
+    margin-bottom: 16px;
+  }
+
+  /* Metrics grid */
+  .metrics { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+  .metric-value {
+    font-size: 28px;
+    font-weight: 700;
+    letter-spacing: -0.5px;
+    color: var(--text);
+    font-variant-numeric: tabular-nums;
+  }
+  .metric-value .unit { font-size: 14px; font-weight: 500; color: var(--text-muted); margin-left: 2px; }
+  .metric-label { font-size: 12px; color: var(--text-muted); margin-top: 2px; }
+
+  /* Services list */
+  .services { display: flex; flex-direction: column; gap: 10px; }
+  .service-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 14px;
+    border-radius: 8px;
+    background: var(--bg);
+  }
+  .service-name { font-size: 14px; font-weight: 500; }
+  .service-badge {
+    font-size: 11px;
+    font-weight: 600;
+    padding: 3px 10px;
+    border-radius: 20px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+  .badge-ok { background: var(--green-bg); color: var(--green); }
+  .badge-warn { background: var(--yellow-bg); color: var(--yellow); }
+  .badge-err { background: var(--red-bg); color: var(--red); }
+
+  /* Info rows */
+  .info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .info-item label { display: block; font-size: 11px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 2px; }
+  .info-item span { font-size: 14px; font-weight: 500; font-variant-numeric: tabular-nums; }
+
+  /* Footer */
+  .footer {
+    margin-top: 24px;
+    text-align: center;
+    font-size: 12px;
+    color: var(--text-muted);
+  }
+  .footer span { color: var(--accent); font-weight: 500; }
+
+  /* Last check */
+  .last-check {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 6px;
+    font-size: 11px;
+    color: var(--text-muted);
+    margin-bottom: 8px;
+  }
+  .last-check .dot {
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    background: var(--green);
+    animation: blink 2s infinite;
+  }
+  @keyframes blink { 50% { opacity: .3; } }
+
+  /* Loading skeleton */
+  .skeleton {
+    background: linear-gradient(90deg, #e5e7eb 25%, #f3f4f6 50%, #e5e7eb 75%);
+    background-size: 200% 100%;
+    animation: shimmer 1.5s infinite;
+    border-radius: 6px;
+    height: 32px;
+  }
+  @keyframes shimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
+
+  @media (max-width: 520px) {
+    .metrics { grid-template-columns: 1fr; }
+    .info-grid { grid-template-columns: 1fr; }
+    .metric-value { font-size: 24px; }
+    body { padding: 24px 16px; }
+  }
+</style>
+</head>
+<body>
+
+<div class="container">
+  <!-- Header -->
+  <div class="header">
+    <div class="logo">
+      <svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M12 2L2 7l10 5 10-5-10-5z"/>
+        <path d="M2 17l10 5 10-5"/>
+        <path d="M2 12l10 5 10-5"/>
+      </svg>
+    </div>
+    <div class="header-text">
+      <h1>SmartFlow API</h1>
+      <p>Backend service health dashboard</p>
+    </div>
+  </div>
+
+  <!-- Live check indicator -->
+  <div class="last-check">
+    <div class="dot"></div>
+    <span>Live — checked <span id="last-check-time">just now</span></span>
+  </div>
+
+  <!-- Status banner -->
+  <div class="status-banner operational" id="status-banner">
+    <div class="pulse"></div>
+    <span id="status-text">All systems operational</span>
+  </div>
+
+  <!-- Uptime & response -->
+  <div class="card">
+    <div class="card-title">Performance</div>
+    <div class="metrics">
+      <div>
+        <div class="metric-value" id="uptime">--</div>
+        <div class="metric-label">Uptime</div>
+      </div>
+      <div>
+        <div class="metric-value" id="response-time">--</div>
+        <div class="metric-label">Response time</div>
+      </div>
+      <div>
+        <div class="metric-value" id="requests">--</div>
+        <div class="metric-label">Checks passed</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Services -->
+  <div class="card">
+    <div class="card-title">Services</div>
+    <div class="services" id="services">
+      <div class="service-row"><span class="service-name">Loading...</span></div>
+    </div>
+  </div>
+
+  <!-- System info -->
+  <div class="card">
+    <div class="card-title">System Information</div>
+    <div class="info-grid" id="sys-info">
+      <div class="info-item"><label>Version</label><span id="info-version">--</span></div>
+      <div class="info-item"><label>Started</label><span id="info-started">--</span></div>
+      <div class="info-item"><label>Environment</label><span id="info-env">--</span></div>
+      <div class="info-item"><label>Python</label><span id="info-python">--</span></div>
+    </div>
+  </div>
+
+  <div class="footer">
+    Powered by <span>SmartFlow</span> &middot; Auto-refreshing every 5s
+  </div>
+</div>
+
+<script>
+(function() {
+  let checkCount = 0;
+  let startedAt = null;
+  let uptimeSeconds = 0;
+  let uptimeInterval = null;
+
+  function formatUptime(s) {
+    const d = Math.floor(s / 86400);
+    const h = Math.floor((s % 86400) / 3600);
+    const m = Math.floor((s % 3600) / 60);
+    const sec = Math.floor(s % 60);
+    if (d > 0) return d + 'd ' + h + 'h ' + m + 'm ' + sec + 's';
+    if (h > 0) return h + 'h ' + m + 'm ' + sec + 's';
+    if (m > 0) return m + 'm ' + sec + 's';
+    return sec + 's';
+  }
+
+  function startUptimeTicker(baseSeconds) {
+    uptimeSeconds = baseSeconds;
+    if (uptimeInterval) clearInterval(uptimeInterval);
+    uptimeInterval = setInterval(function() {
+      uptimeSeconds++;
+      document.getElementById('uptime').textContent = formatUptime(uptimeSeconds);
+    }, 1000);
+  }
+
+  function setBanner(status, text) {
+    var banner = document.getElementById('status-banner');
+    banner.className = 'status-banner ' + status;
+    document.getElementById('status-text').textContent = text;
+  }
+
+  function renderServices(data) {
+    var container = document.getElementById('services');
+    var services = [
+      { name: 'API Server', ok: data.status === 'healthy' },
+      { name: 'PostgreSQL', ok: data.database === 'connected' },
+      { name: 'MQTT Broker', ok: data.mqtt === 'connected', warn: data.mqtt === 'not_configured' }
+    ];
+
+    container.innerHTML = services.map(function(s) {
+      var cls = s.ok ? 'badge-ok' : (s.warn ? 'badge-warn' : 'badge-err');
+      var label = s.ok ? 'Healthy' : (s.warn ? 'Inactive' : 'Down');
+      return '<div class="service-row">' +
+        '<span class="service-name">' + s.name + '</span>' +
+        '<span class="service-badge ' + cls + '">' + label + '</span>' +
+        '</div>';
+    }).join('');
+  }
+
+  function formatDate(iso) {
+    var d = new Date(iso);
+    return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) +
+      ' ' + d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+  }
+
+  async function fetchHealth() {
+    var t0 = performance.now();
+    try {
+      var res = await fetch('/api/health');
+      var ms = Math.round(performance.now() - t0);
+      var data = await res.json();
+
+      checkCount++;
+
+      // Banner
+      var allOk = data.status === 'healthy' && data.database === 'connected';
+      var mqttOk = data.mqtt === 'connected';
+      if (!allOk) {
+        setBanner('down', 'System degraded — check services');
+      } else if (!mqttOk && data.mqtt !== 'not_configured') {
+        setBanner('degraded', 'Partial degradation — MQTT offline');
+      } else {
+        setBanner('operational', 'All systems operational');
+      }
+
+      // Uptime
+      startUptimeTicker(data.uptime_seconds);
+
+      // Response time
+      document.getElementById('response-time').innerHTML = ms + '<span class="unit">ms</span>';
+
+      // Checks
+      document.getElementById('requests').textContent = checkCount;
+
+      // Services
+      renderServices(data);
+
+      // Sys info
+      document.getElementById('info-version').textContent = 'v' + data.version;
+      document.getElementById('info-started').textContent = formatDate(data.started_at);
+      document.getElementById('info-env').textContent = data.environment;
+      document.getElementById('info-python').textContent = data.python_version;
+
+      // Last check
+      document.getElementById('last-check-time').textContent = 'just now';
+
+    } catch(e) {
+      setBanner('down', 'Cannot reach API server');
+      document.getElementById('response-time').innerHTML = '--';
+    }
+  }
+
+  // Initial + interval
+  fetchHealth();
+  setInterval(fetchHealth, 5000);
+
+  // Update "last check" text
+  var checkAge = 0;
+  setInterval(function() {
+    checkAge++;
+    if (checkAge >= 5) checkAge = 0;
+    var el = document.getElementById('last-check-time');
+    el.textContent = checkAge === 0 ? 'just now' : checkAge + 's ago';
+  }, 1000);
+})();
+</script>
+</body>
+</html>

@@ -60,6 +60,10 @@ class MQTTClient:
         self._task: Optional[asyncio.Task] = None
         self._ready = asyncio.Event()
 
+    @property
+    def connected(self) -> bool:
+        return self._ready.is_set()
+
     async def start(self) -> None:
         """Starts the MQTT background loop task."""
         if not self._settings.mqtt_configured:
