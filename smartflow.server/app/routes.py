@@ -119,12 +119,6 @@ def _raise_purchase_error(exc: PurchaseError) -> None:
 
 # -- Generic Endpoints -------------------------------------------------------
 
-@router.get("/health")
-async def health():
-    """Simple health check endpoint."""
-    return {"status": "ok"}
-
-
 # -- User Context Endpoints --------------------------------------------------
 
 @router.get("/me", response_model=MeOut)
