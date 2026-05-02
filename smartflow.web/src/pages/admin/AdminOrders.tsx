@@ -70,7 +70,6 @@ function CaneRow({ c }: { c: AdminOrderCane }) {
 function OrderCard({ o }: { o: AdminOrder }) {
   const [open, setOpen] = useState(false);
   const byTap = groupByTap(o.canes);
-  const gs = GROUP_STATUS[o.status] ?? { label: o.status, color: "#64748b", bg: "#f1f5f9" };
 
   return (
     <Paper
@@ -88,11 +87,7 @@ function OrderCard({ o }: { o: AdminOrder }) {
             <Typography variant="body2" sx={{ fontWeight: 600 }}>
               {o.user_email}
             </Typography>
-            <Chip
-              label={gs.label}
-              size="small"
-              sx={{ fontWeight: 500, fontSize: "0.65rem", height: 20, color: gs.color, bgcolor: gs.bg }}
-            />
+            {statusChip(GROUP_STATUS, o.status)}
           </div>
           <div className="flex items-center gap-3 text-xs text-slate-500 flex-wrap">
             <span>{o.plant_name}</span>

@@ -70,7 +70,6 @@ function CaneRow({ c }: { c: AdminOrderCane }) {
 function OrderCard({ o }: { o: AdminOrder }) {
   const [open, setOpen] = useState(false);
   const byTap = groupByTap(o.canes);
-  const gs = GROUP_STATUS[o.status] ?? { label: o.status, color: "#64748b", bg: "#f1f5f9" };
 
   return (
     <Paper
