@@ -289,8 +289,14 @@ export const deleteOperatingHour = (id: number) =>
 // Transactions
 // ---------------------------------------------------------------------------
 
-export const getAdminTransactions = (userId?: number) =>
-  api.get<AdminTransaction[]>("/api/admin/transactions", { params: userId ? { user_id: userId } : {} }).then((r) => r.data);
+export const getAdminTransactions = (userId?: number, dateFrom?: string, dateTo?: string) =>
+  api.get<AdminTransaction[]>("/api/admin/transactions", {
+    params: {
+      ...(userId ? { user_id: userId } : {}),
+      ...(dateFrom ? { date_from: dateFrom } : {}),
+      ...(dateTo ? { date_to: dateTo } : {}),
+    },
+  }).then((r) => r.data);
 
 // ---------------------------------------------------------------------------
 // Customer Types

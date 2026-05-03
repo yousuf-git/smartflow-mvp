@@ -22,7 +22,9 @@ import time
 from decimal import Decimal
 
 import httpx
-from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
+from datetime import date, datetime, timedelta, timezone
+
+from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
@@ -130,15 +132,23 @@ async def customer_dashboard(
 
 @router.get("/transactions", response_model=list[TransactionListOut])
 async def customer_transactions(
+    date_from: date | None = Query(None),
+    date_to: date | None = Query(None),
     user: User = Depends(require_role(UserRole.customer)),
     session: AsyncSession = Depends(_db),
 ):
     """Returns the full financial history (deposits/payments) for the user."""
-    txs = (await session.scalars(
+    q = (
         select(WalletTransaction)
         .where(WalletTransaction.user_id == user.id)
         .order_by(WalletTransaction.timestamp.desc())
-    )).all()
+    )
+    if date_from:
+        q = q.where(WalletTransaction.timestamp >= datetime(date_from.year, date_from.month, date_from.day, tzinfo=timezone.utc))
+    if date_to:
+        end = datetime(date_to.year, date_to.month, date_to.day, tzinfo=timezone.utc) + timedelta(days=1)
+        q = q.where(WalletTransaction.timestamp < end)
+    txs = (await session.scalars(q)).all()
 
     return [
         TransactionListOut(
@@ -155,6 +165,8 @@ async def customer_transactions(
 
 @router.get("/purchases", response_model=list[CustomerPurchaseOut])
 async def customer_purchases(
+    date_from: date | None = Query(None),
+    date_to: date | None = Query(None),
     user: User = Depends(require_role(UserRole.customer)),
     session: AsyncSession = Depends(_db),
 ):
@@ -162,12 +174,18 @@ async def customer_purchases(
     Returns a history of water orders.
     Eagerly loads purchases and calculates totals (litres and price) per order.
     """
-    groups = (await session.scalars(
+    q = (
         select(PurchaseGroup)
         .where(PurchaseGroup.user_id == user.id)
         .options(selectinload(PurchaseGroup.purchases))
         .order_by(PurchaseGroup.created_at.desc())
-    )).all()
+    )
+    if date_from:
+        q = q.where(PurchaseGroup.created_at >= datetime(date_from.year, date_from.month, date_from.day, tzinfo=timezone.utc))
+    if date_to:
+        end = datetime(date_to.year, date_to.month, date_to.day, tzinfo=timezone.utc) + timedelta(days=1)
+        q = q.where(PurchaseGroup.created_at < end)
+    groups = (await session.scalars(q)).all()
 
     result = []
     for g in groups:

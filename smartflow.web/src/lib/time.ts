@@ -7,3 +7,19 @@ export function formatTime12h(value: string): string {
   const displayHour = hour % 12 || 12;
   return `${displayHour}:${minute} ${period}`;
 }
+
+export type Period = "today" | "7d" | "30d" | "custom";
+
+function toISO(d: Date): string {
+  return d.toISOString().slice(0, 10);
+}
+
+export function periodDates(period: Period): { from: string; to: string } | null {
+  if (period === "custom") return null;
+  const today = new Date();
+  const to = toISO(today);
+  if (period === "today") return { from: to, to };
+  const ago = new Date(today);
+  ago.setDate(ago.getDate() - (period === "7d" ? 6 : 29));
+  return { from: toISO(ago), to };
+}

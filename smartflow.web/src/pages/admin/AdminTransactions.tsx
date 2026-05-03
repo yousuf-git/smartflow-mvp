@@ -1,22 +1,65 @@
 import { useEffect, useState } from "react";
-import { Paper, Chip, Skeleton } from "@mui/material";
+import { Paper, Chip, Skeleton, TextField, Button } from "@mui/material";
 import { getAdminTransactions, type AdminTransaction } from "../../lib/adminApi";
+import { type Period, periodDates } from "../../lib/time";
+
+const PERIODS: { key: Period; label: string }[] = [
+  { key: "today", label: "Today" },
+  { key: "7d", label: "7D" },
+  { key: "30d", label: "30D" },
+];
 
 export default function AdminTransactions() {
   const [txs, setTxs] = useState<AdminTransaction[]>([]);
   const [loading, setLoading] = useState(true);
+  const [period, setPeriod] = useState<Period>("today");
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState("");
 
   useEffect(() => {
-    getAdminTransactions()
+    setLoading(true);
+    const range = period === "custom" ? { from: dateFrom, to: dateTo } : periodDates(period);
+    getAdminTransactions(undefined, range?.from || undefined, range?.to || undefined)
       .then(setTxs)
       .finally(() => setLoading(false));
-  }, []);
+  }, [period, dateFrom, dateTo]);
+
+  const selectPeriod = (p: Period) => {
+    if (p !== "custom") {
+      setDateFrom("");
+      setDateTo("");
+    }
+    setPeriod(p);
+  };
 
   return (
     <div className="space-y-6">
       <div>
         <h1 className="text-xl font-bold text-ink-900 mb-1">Transactions</h1>
         <p className="text-sm text-ink-300">Wallet ledger entries</p>
+      </div>
+
+      <div className="flex flex-wrap items-center gap-3">
+        <div className="flex gap-1.5">
+          {PERIODS.map((p) => (
+            <Chip
+              key={p.key}
+              label={p.label}
+              size="small"
+              variant={period === p.key ? "filled" : "outlined"}
+              color={period === p.key ? "primary" : "default"}
+              onClick={() => selectPeriod(p.key)}
+              sx={{ fontWeight: 500 }}
+            />
+          ))}
+        </div>
+        <TextField label="From" type="date" size="small" value={dateFrom} onChange={(e) => { setDateFrom(e.target.value); setPeriod("custom"); }} slotProps={{ inputLabel: { shrink: true } }} />
+        <TextField label="To" type="date" size="small" value={dateTo} onChange={(e) => { setDateTo(e.target.value); setPeriod("custom"); }} slotProps={{ inputLabel: { shrink: true } }} />
+        {period === "custom" && (
+          <Button size="small" onClick={() => selectPeriod("today")} sx={{ textTransform: "none" }}>
+            Clear dates
+          </Button>
+        )}
       </div>
 
       <Paper
@@ -82,7 +125,7 @@ export default function AdminTransactions() {
                 {txs.length === 0 && (
                   <tr>
                     <td colSpan={6} className="px-5 py-10 text-center text-ink-300">
-                      No transactions yet.
+                      No transactions found.
                     </td>
                   </tr>
                 )}

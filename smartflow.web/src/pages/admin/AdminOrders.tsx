@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Chip, Paper, Skeleton, TextField, Button, Typography } from "@mui/material";
 import { ChevronDown, ChevronUp, Droplets } from "lucide-react";
 import { getAdminOrders, type AdminOrder, type AdminOrderCane } from "../../lib/adminApi";
+import { type Period, periodDates } from "../../lib/time";
 
 const GROUP_STATUS: Record<string, { label: string; color: string; bg: string }> = {
   completed:         { label: "Completed",   color: "#059669", bg: "#ecfdf5" },
@@ -132,19 +133,35 @@ function OrderCard({ o }: { o: AdminOrder }) {
   );
 }
 
+const PERIODS: { key: Period; label: string }[] = [
+  { key: "today", label: "Today" },
+  { key: "7d", label: "7D" },
+  { key: "30d", label: "30D" },
+];
+
 export default function AdminOrders() {
   const [orders, setOrders] = useState<AdminOrder[]>([]);
   const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState("");
+  const [period, setPeriod] = useState<Period>("today");
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
 
   useEffect(() => {
     setLoading(true);
-    getAdminOrders(statusFilter || undefined, dateFrom || undefined, dateTo || undefined)
+    const range = period === "custom" ? { from: dateFrom, to: dateTo } : periodDates(period);
+    getAdminOrders(statusFilter || undefined, range?.from || undefined, range?.to || undefined)
       .then(setOrders)
       .finally(() => setLoading(false));
-  }, [statusFilter, dateFrom, dateTo]);
+  }, [statusFilter, period, dateFrom, dateTo]);
+
+  const selectPeriod = (p: Period) => {
+    if (p !== "custom") {
+      setDateFrom("");
+      setDateTo("");
+    }
+    setPeriod(p);
+  };
 
   return (
     <div className="space-y-6">
@@ -167,10 +184,23 @@ export default function AdminOrders() {
             />
           ))}
         </div>
-        <TextField label="From" type="date" size="small" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} slotProps={{ inputLabel: { shrink: true } }} />
-        <TextField label="To" type="date" size="small" value={dateTo} onChange={(e) => setDateTo(e.target.value)} slotProps={{ inputLabel: { shrink: true } }} />
-        {(dateFrom || dateTo) && (
-          <Button size="small" onClick={() => { setDateFrom(""); setDateTo(""); }} sx={{ textTransform: "none" }}>
+        <div className="flex gap-1.5">
+          {PERIODS.map((p) => (
+            <Chip
+              key={p.key}
+              label={p.label}
+              size="small"
+              variant={period === p.key ? "filled" : "outlined"}
+              color={period === p.key ? "primary" : "default"}
+              onClick={() => selectPeriod(p.key)}
+              sx={{ fontWeight: 500 }}
+            />
+          ))}
+        </div>
+        <TextField label="From" type="date" size="small" value={dateFrom} onChange={(e) => { setDateFrom(e.target.value); setPeriod("custom"); }} slotProps={{ inputLabel: { shrink: true } }} />
+        <TextField label="To" type="date" size="small" value={dateTo} onChange={(e) => { setDateTo(e.target.value); setPeriod("custom"); }} slotProps={{ inputLabel: { shrink: true } }} />
+        {period === "custom" && (
+          <Button size="small" onClick={() => selectPeriod("today")} sx={{ textTransform: "none" }}>
             Clear dates
           </Button>
         )}

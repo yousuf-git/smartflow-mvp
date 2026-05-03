@@ -1079,12 +1079,19 @@ async def list_orders(
 @router.get("/transactions", response_model=list[TransactionListOut])
 async def list_transactions(
     user_id: int | None = Query(None),
+    date_from: date | None = Query(None),
+    date_to: date | None = Query(None),
     _user: User = Depends(require_role(UserRole.admin)),
     session: AsyncSession = Depends(_db),
 ):
     q = select(WalletTransaction).order_by(WalletTransaction.timestamp.desc())
     if user_id:
         q = q.where(WalletTransaction.user_id == user_id)
+    if date_from:
+        q = q.where(WalletTransaction.timestamp >= datetime(date_from.year, date_from.month, date_from.day, tzinfo=timezone.utc))
+    if date_to:
+        end = datetime(date_to.year, date_to.month, date_to.day, tzinfo=timezone.utc) + timedelta(days=1)
+        q = q.where(WalletTransaction.timestamp < end)
     txs = (await session.scalars(q)).all()
     result = []
     for tx in txs:

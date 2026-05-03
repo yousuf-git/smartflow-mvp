@@ -88,13 +88,23 @@ export async function getCustomerPlants(): Promise<CustomerPlant[]> {
   return data;
 }
 
-export async function getCustomerTransactions(): Promise<CustomerTransaction[]> {
-  const { data } = await api.get<CustomerTransaction[]>("/api/customer/transactions");
+export async function getCustomerTransactions(dateFrom?: string, dateTo?: string): Promise<CustomerTransaction[]> {
+  const { data } = await api.get<CustomerTransaction[]>("/api/customer/transactions", {
+    params: {
+      ...(dateFrom ? { date_from: dateFrom } : {}),
+      ...(dateTo ? { date_to: dateTo } : {}),
+    },
+  });
   return data;
 }
 
-export async function getCustomerPurchases(): Promise<CustomerPurchase[]> {
-  const { data } = await api.get<CustomerPurchase[]>("/api/customer/purchases");
+export async function getCustomerPurchases(dateFrom?: string, dateTo?: string): Promise<CustomerPurchase[]> {
+  const { data } = await api.get<CustomerPurchase[]>("/api/customer/purchases", {
+    params: {
+      ...(dateFrom ? { date_from: dateFrom } : {}),
+      ...(dateTo ? { date_to: dateTo } : {}),
+    },
+  });
   return data;
 }
 
