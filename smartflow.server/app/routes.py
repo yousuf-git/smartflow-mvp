@@ -39,6 +39,7 @@ from app.models import (
     Purchase,
     PurchaseGroup,
     PurchaseStatus,
+    Tap,
     User,
 )
 from app.mqtt import cmd_topic, get_mqtt_client
@@ -383,10 +384,24 @@ async def stop_cane(
     cane.status = PurchaseStatus.partial_completed
     cane.reason = "user_stopped"
     cane.completed_at = datetime.now(tz.utc)
+
+    # Release tap if no other active canes remain on it
+    group = await purchase_service.load_group(session, cane.group_id)
+    if group is not None:
+        has_active_on_tap = any(
+            p.tap_id == cane.tap_id and p.id != cane.id
+            and p.status in (PurchaseStatus.pending, PurchaseStatus.started)
+            for p in group.purchases
+        )
+        if not has_active_on_tap:
+            tap = await session.get(Tap, cane.tap_id)
+            if tap is not None:
+                tap.is_available = True
+
     await session.commit()
 
     cane_out = await _cane_out(session, cane)
-    
+
     # Notify WebSocket about the manual stop
     frame = {
         "cane_id": cane.id,
@@ -397,7 +412,6 @@ async def stop_cane(
     }
     await registry.push_progress(cane.id, frame)
 
-    group = await purchase_service.load_group(session, cane.group_id)
     if group is not None:
         all_terminal = all(
             p.status in purchase_service.TERMINAL_STATUSES for p in group.purchases
