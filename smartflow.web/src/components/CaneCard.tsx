@@ -165,7 +165,7 @@ export default function CaneCard({
               {cane.status === "completed" && "Filled successfully."}
               {cane.status === "partial_completed" && "Stopped early — partial amount kept."}
               {cane.status === "failed" && "Failed — unused credit returned."}
-              {cane.status === "cancelled" && "Cancelled — credit returned."}
+              {cane.status === "cancelled" && "Cancelled - credit returned."}
             </Typography>
           )}
           {cane.status === "pending" && cane.retry_count > 0 && (
