@@ -87,7 +87,7 @@ function derive(_plant: Plant, me: Me, draft: DraftCane[]): Derived {
   }
   if (totalLitres > me.daily_remaining_litres) {
     errors.push(
-      `Exceeds daily limit — ${totalLitres.toFixed(1)} L requested, ${me.daily_remaining_litres.toFixed(1)} L remaining.`,
+      `Exceeds daily limit — ${totalLitres.toFixed(2)} L requested, ${me.daily_remaining_litres.toFixed(2)} L remaining.`,
     );
   }
 
@@ -311,7 +311,7 @@ export default function CaneBuilder({
           <div className="flex items-baseline gap-1.5">
             <WaterDropOutlinedIcon color="primary" sx={{ fontSize: 18, mb: "-2px" }} />
             <Typography variant="h6" sx={{ fontWeight: 700 }}>
-              {derived.totalLitres.toFixed(1)} L
+              {derived.totalLitres.toFixed(2)} L
             </Typography>
           </div>
           <Typography variant="body2" sx={{ color: "text.secondary" }}>

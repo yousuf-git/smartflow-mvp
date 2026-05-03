@@ -76,7 +76,7 @@ export default function CustomerDashboard() {
           <div>
             <p className="text-sm text-slate-500">Wallet Balance</p>
             <h2 className="text-3xl font-bold text-ink-900">
-              {dash.currency} {dash.balance.toFixed(0)}
+              {dash.currency} {dash.balance.toFixed(2)}
             </h2>
           </div>
           <div className="w-12 h-12 rounded-2xl bg-aqua-50 flex items-center justify-center z-10">
@@ -85,12 +85,12 @@ export default function CustomerDashboard() {
         </div>
         {dash.hold_balance > 0 && (
           <p className="text-sm text-amber-600">
-            On hold: {dash.currency} {dash.hold_balance.toFixed(0)}
+            On hold: {dash.currency} {dash.hold_balance.toFixed(2)}
           </p>
         )}
         <div className="flex items-center gap-1 text-sm text-slate-500 mt-1">
           <Droplets className="w-3.5 h-3.5" />
-          <span>Current water rate: {dash.currency} {dash.price_per_litre.toFixed(0)} per litre</span>
+          <span>Current water rate: {dash.currency} {dash.price_per_litre.toFixed(2)} per litre</span>
         </div>
       </Paper>
 
@@ -107,21 +107,21 @@ export default function CustomerDashboard() {
           {
             icon: Droplets,
             label: "Total Litres",
-            value: `${dash.total_litres.toFixed(1)}L`,
+            value: `${dash.total_litres.toFixed(2)}L`,
             color: "text-cyan-500",
             bg: "bg-cyan-50",
           },
           {
             icon: Gauge,
             label: "Daily Limit",
-            value: `${dash.daily_limit_litres.toFixed(0)}L`,
+            value: `${dash.daily_limit_litres.toFixed(2)}L`,
             color: "text-emerald-500",
             bg: "bg-emerald-50",
           },
           {
             icon: TimerReset,
             label: "Remaining Today",
-            value: `${dash.daily_remaining_litres.toFixed(1)}L`,
+            value: `${dash.daily_remaining_litres.toFixed(2)}L`,
             color: "text-amber-500",
             bg: "bg-amber-50",
           },
@@ -187,7 +187,7 @@ export default function CustomerDashboard() {
                   </div>
                 </div>
                 <Chip
-                  label={`${tx.type === "credit" ? "+" : "-"}${tx.amount.toFixed(0)}`}
+                  label={`${tx.type === "credit" ? "+" : "-"}${tx.amount.toFixed(2)}`}
                   size="small"
                   sx={{
                     fontWeight: 600,

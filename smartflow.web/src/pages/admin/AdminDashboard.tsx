@@ -115,7 +115,7 @@ export default function AdminDashboard() {
           <StatCard icon={<Users className="w-5 h-5 text-aqua-600" />} label="Total Users" value={data.total_users} color="#0F8CB0" />
           <StatCard icon={<UsersRound className="w-5 h-5 text-aqua-600" />} label="Customers" value={data.total_customers} color="#0F8CB0" />
           <StatCard icon={<Receipt className="w-5 h-5" style={{ color: "#3B7A57" }} />} label="Total Sessions" value={data.total_orders} color="#3B7A57" />
-          <StatCard icon={<DollarSign className="w-5 h-5" style={{ color: "#3B7A57" }} />} label="Total Revenue" value={`Rs. ${data.total_revenue.toFixed(0)}`} color="#3B7A57" />
+          <StatCard icon={<DollarSign className="w-5 h-5" style={{ color: "#3B7A57" }} />} label="Total Revenue" value={`Rs. ${data.total_revenue.toFixed(2)}`} color="#3B7A57" />
         </div>
       </div>
 
@@ -126,8 +126,8 @@ export default function AdminDashboard() {
         </h2>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           <StatCard icon={<CalendarClock className="w-5 h-5 text-aqua-600" />} label="Today's Sessions" value={data.today_orders} color="#0F8CB0" />
-          <StatCard icon={<TrendingUp className="w-5 h-5" style={{ color: "#3B7A57" }} />} label="Today's Revenue" value={`Rs. ${data.today_revenue.toFixed(0)}`} color="#3B7A57" />
-          <StatCard icon={<Droplets className="w-5 h-5 text-aqua-600" />} label="Litres Dispensed" value={`${data.total_litres_dispensed.toFixed(1)} L`} color="#0F8CB0" />
+          <StatCard icon={<TrendingUp className="w-5 h-5" style={{ color: "#3B7A57" }} />} label="Today's Revenue" value={`Rs. ${data.today_revenue.toFixed(2)}`} color="#3B7A57" />
+          <StatCard icon={<Droplets className="w-5 h-5 text-aqua-600" />} label="Litres Dispensed" value={`${data.total_litres_dispensed.toFixed(2)} L`} color="#0F8CB0" />
           <StatCard icon={<Activity className="w-5 h-5" style={{ color: "#D97757" }} />} label="Active Sessions" value={data.active_sessions} color="#D97757" />
         </div>
       </div>
@@ -143,7 +143,7 @@ export default function AdminDashboard() {
                 <CartesianGrid strokeDasharray="3 3" stroke="#EDF0F2" />
                 <XAxis dataKey="date" tick={{ fontSize: 10 }} tickFormatter={(v: string) => v.slice(5)} />
                 <YAxis tick={{ fontSize: 10 }} />
-                <Tooltip formatter={(v) => [`Rs. ${Number(v).toFixed(0)}`, "Revenue"]} />
+                <Tooltip formatter={(v) => [`Rs. ${Number(v).toFixed(2)}`, "Revenue"]} />
                 <Line type="monotone" dataKey="value" stroke="#0F8CB0" strokeWidth={2} dot={false} />
               </LineChart>
             </ResponsiveContainer>

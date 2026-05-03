@@ -66,7 +66,7 @@ export default function ManagerCustomers() {
                       PKR {c.balance.toFixed(2)}
                     </td>
                     <td className="px-5 py-3 text-right text-ink-700 hidden sm:table-cell">
-                      {c.daily_consumed.toFixed(1)} L
+                      {c.daily_consumed.toFixed(2)} L
                     </td>
                   </tr>
                 ))}

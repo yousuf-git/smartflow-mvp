@@ -251,7 +251,7 @@ export default function AdminUsers() {
                     </td>
                     <td className="px-5 py-3 text-ink-700 hidden lg:table-cell">
                       {u.customer_type && <span className="capitalize">{u.customer_type}</span>}
-                      {u.balance != null && <span className="ml-2 text-ink-300">Rs. {u.balance.toFixed(0)}</span>}
+                      {u.balance != null && <span className="ml-2 text-ink-300">Rs. {u.balance.toFixed(2)}</span>}
                     </td>
                     <td className="px-5 py-3 text-ink-300 hidden md:table-cell">{new Date(u.created_at).toLocaleDateString()}</td>
                     <td className="px-5 py-3 text-right">

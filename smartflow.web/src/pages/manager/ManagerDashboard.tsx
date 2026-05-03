@@ -89,13 +89,13 @@ export default function ManagerDashboard() {
           <StatCard
             icon={<Droplets className="w-5 h-5 text-aqua-600" />}
             label="Litres Dispensed"
-            value={`${data.total_litres_dispensed.toFixed(1)} L`}
+            value={`${data.total_litres_dispensed.toFixed(2)} L`}
             color="#0F8CB0"
           />
           <StatCard
             icon={<DollarSign className="w-5 h-5" style={{ color: "#3B7A57" }} />}
             label="Total Revenue"
-            value={`Rs. ${data.total_revenue.toFixed(0)}`}
+            value={`Rs. ${data.total_revenue.toFixed(2)}`}
             color="#3B7A57"
           />
           <StatCard
@@ -121,7 +121,7 @@ export default function ManagerDashboard() {
           <StatCard
             icon={<TrendingUp className="w-5 h-5" style={{ color: "#3B7A57" }} />}
             label="Today's Revenue"
-            value={`Rs. ${data.today_revenue.toFixed(0)}`}
+            value={`Rs. ${data.today_revenue.toFixed(2)}`}
             color="#3B7A57"
           />
           <StatCard

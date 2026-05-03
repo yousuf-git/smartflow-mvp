@@ -57,10 +57,10 @@ function CaneRow({ c }: { c: AdminOrderCane }) {
       </div>
       <div className="flex items-center gap-3 text-right shrink-0">
         <span className="text-slate-600">
-          {c.litres_delivered.toFixed(1)} of {c.litres_requested.toFixed(1)} L
+          {c.litres_delivered.toFixed(2)} of {c.litres_requested.toFixed(2)} L
         </span>
         <span className="text-slate-800 font-medium w-16 text-right">
-          Rs. {c.price.toFixed(0)}
+          Rs. {c.price.toFixed(2)}
         </span>
       </div>
     </div>
@@ -92,10 +92,10 @@ function OrderCard({ o }: { o: AdminOrder }) {
           <div className="flex items-center gap-3 text-xs text-slate-500 flex-wrap">
             <span className="flex items-center gap-1">
               <Droplets className="w-3 h-3" />
-              {o.total_litres.toFixed(1)} L
+              {o.total_litres.toFixed(2)} L
             </span>
             <span>{o.cane_count} cane{o.cane_count > 1 ? "s" : ""}</span>
-            <span className="font-medium text-slate-700">Rs. {o.total_price.toFixed(0)}</span>
+            <span className="font-medium text-slate-700">Rs. {o.total_price.toFixed(2)}</span>
           </div>
         </div>
         <div className="flex flex-col items-end gap-1 shrink-0">
@@ -121,8 +121,8 @@ function OrderCard({ o }: { o: AdminOrder }) {
           ))}
           {o.unit_price != null && (
             <div className="text-[11px] text-slate-400 pt-1 border-t border-slate-50">
-              Rate: Rs. {o.unit_price.toFixed(0)}/L
-              {o.daily_litre_limit != null && <span> &middot; Limit: {o.daily_litre_limit.toFixed(0)} L/day</span>}
+              Rate: Rs. {o.unit_price.toFixed(2)}/L
+              {o.daily_litre_limit != null && <span> &middot; Limit: {o.daily_litre_limit.toFixed(2)} L/day</span>}
             </div>
           )}
         </div>

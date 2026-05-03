@@ -73,7 +73,7 @@ export default function ProgressScreen({
                 sx={{ bgcolor: "#F6F8F9", color: "text.secondary", fontWeight: 600 }}
               />
               <Chip
-                label={`${order.total_litres.toFixed(1)} L`}
+                label={`${order.total_litres.toFixed(2)} L`}
                 size="small"
                 sx={{ bgcolor: "#E8F6FB", color: "#074E66", fontWeight: 600 }}
               />

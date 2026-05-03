@@ -71,15 +71,15 @@ export default function WalletHeader({ me, activeOrder }: Props) {
 
           <div className="flex items-baseline justify-end gap-1">
             <Typography variant="subtitle1" sx={{ fontWeight: 700 }}>
-              {remaining.toFixed(1)} L
+              {remaining.toFixed(2)} L
             </Typography>
             <Typography variant="body2" sx={{ color: "text.secondary" }}>
-              of {me.daily_limit_litres.toFixed(1)} L
+              of {me.daily_limit_litres.toFixed(2)} L
             </Typography>
           </div>
           <Typography variant="caption" sx={{ color: "text.secondary" }}>
             {usedLitres > 0
-              ? `${usedLitres.toFixed(1)} L used today`
+              ? `${usedLitres.toFixed(2)} L used today`
               : "none used today"}
           </Typography>
         </div>

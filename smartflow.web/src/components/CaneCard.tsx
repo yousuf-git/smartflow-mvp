@@ -47,7 +47,7 @@ export default function CaneCard({
       ease: "power2.out",
       onUpdate: () => {
         displayedRef.current = obj.value;
-        if (numRef.current) numRef.current.textContent = obj.value.toFixed(1);
+        if (numRef.current) numRef.current.textContent = obj.value.toFixed(2);
       },
     });
     return () => {
@@ -115,10 +115,10 @@ export default function CaneCard({
               fontVariantNumeric: "tabular-nums",
             }}
           >
-            0.0
+            0.00
           </span>
           <Typography variant="body2" sx={{ color: "text.secondary" }}>
-            of {cane.litres_requested.toFixed(1)} L · PKR {cane.price.toFixed(2)}
+            of {cane.litres_requested.toFixed(2)} L · PKR {cane.price.toFixed(2)}
           </Typography>
         </div>
 

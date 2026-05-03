@@ -91,10 +91,10 @@ function CaneRow({ cane }: { cane: CustomerCaneDetail }) {
       </div>
       <div className="flex items-center gap-3 text-right shrink-0">
         <span className="text-slate-600">
-          {cane.litres_delivered.toFixed(1)} of {cane.litres_requested.toFixed(1)} L
+          {cane.litres_delivered.toFixed(2)} of {cane.litres_requested.toFixed(2)} L
         </span>
         <span className="text-slate-800 font-medium w-16 text-right">
-          Rs. {cane.price.toFixed(0)}
+          Rs. {cane.price.toFixed(2)}
         </span>
       </div>
     </div>
@@ -125,10 +125,10 @@ function PurchaseCard({ p }: { p: CustomerPurchase }) {
           <div className="flex items-center gap-3 text-xs text-slate-500">
             <span className="flex items-center gap-1">
               <Droplets className="w-3 h-3" />
-              {p.total_litres.toFixed(1)} L
+              {p.total_litres.toFixed(2)} L
             </span>
             <span>{p.cane_count} cane{p.cane_count > 1 ? "s" : ""}</span>
-            <span className="font-medium text-slate-700">Rs. {p.total_price.toFixed(0)}</span>
+            <span className="font-medium text-slate-700">Rs. {p.total_price.toFixed(2)}</span>
           </div>
         </div>
         <div className="flex flex-col items-end gap-1 shrink-0 ml-3">
@@ -268,7 +268,7 @@ export default function CustomerTransactions() {
                   </div>
                 </div>
                 <Chip
-                  label={`${tx.type === "credit" ? "+" : "-"} Rs. ${tx.amount.toFixed(0)}`}
+                  label={`${tx.type === "credit" ? "+" : "-"} Rs. ${tx.amount.toFixed(2)}`}
                   size="small"
                   sx={{
                     fontWeight: 600,

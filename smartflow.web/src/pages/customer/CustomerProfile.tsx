@@ -184,15 +184,15 @@ export default function CustomerProfile() {
             <Wallet className="w-4 h-4 text-slate-600" />
           </div>
           <p className="text-xs text-slate-500">Wallet Balance</p>
-          <p className="text-lg font-bold text-ink-900">Rs. {dash?.balance.toFixed(0) ?? "0"}</p>
+          <p className="text-lg font-bold text-ink-900">Rs. {dash?.balance.toFixed(2) ?? "0.00"}</p>
         </Paper>
         <Paper elevation={0} sx={{ p: 2, borderRadius: 2.5 }} className="border border-slate-100">
           <div className="w-9 h-9 rounded-xl bg-slate-50 flex items-center justify-center mb-2">
             <Shield className="w-4 h-4 text-slate-600" />
           </div>
           <p className="text-xs text-slate-500">Water Plan</p>
-          <p className="text-sm font-semibold text-ink-900">Rs. {dash?.price_per_litre.toFixed(0) ?? "0"}/L</p>
-          <p className="text-xs text-slate-400">{dash?.daily_limit_litres.toFixed(0) ?? "0"} L daily limit</p>
+          <p className="text-sm font-semibold text-ink-900">Rs. {dash?.price_per_litre.toFixed(2) ?? "0.00"}/L</p>
+          <p className="text-xs text-slate-400">{dash?.daily_limit_litres.toFixed(2) ?? "0.00"} L daily limit</p>
         </Paper>
       </div>
 
@@ -219,7 +219,7 @@ export default function CustomerProfile() {
             <Droplets className="w-4 h-4 text-slate-400" />
             <div>
               <p className="text-xs text-slate-400">Today Remaining</p>
-              <p className="text-sm font-medium text-ink-900">{dash?.daily_remaining_litres.toFixed(1) ?? "0"} L</p>
+              <p className="text-sm font-medium text-ink-900">{dash?.daily_remaining_litres.toFixed(2) ?? "0.00"} L</p>
             </div>
           </div>
         </div>
