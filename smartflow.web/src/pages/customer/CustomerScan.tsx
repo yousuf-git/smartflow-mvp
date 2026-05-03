@@ -304,10 +304,12 @@ export default function CustomerScan() {
   return (
     <div className="min-h-full w-full flex items-start justify-center p-4 sm:p-6">
       <main className="w-full max-w-3xl flex flex-col gap-4">
-        <WalletHeader
-          me={me}
-          activeOrder={screen.kind === "progress" ? screen.order : null}
-        />
+        {(screen.kind === "home" || screen.kind === "submitting") && (
+          <WalletHeader
+            me={me}
+            activeOrder={null}
+          />
+        )}
 
         {screen.kind === "home" || screen.kind === "submitting" ? (
           <CaneBuilder
@@ -323,6 +325,7 @@ export default function CustomerScan() {
           <ProgressScreen
             order={screen.order}
             plant={plant}
+            me={me}
             idleDeadlines={idleDeadlines}
             startingCaneId={screen.startingCaneId}
             onStart={onStart}

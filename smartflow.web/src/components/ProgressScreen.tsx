@@ -1,12 +1,14 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Button, Chip, Paper, Typography } from "@mui/material";
+import { Button, Chip, IconButton, Paper, Typography } from "@mui/material";
+import ArrowBackRoundedIcon from "@mui/icons-material/ArrowBackRounded";
 import QrCodeScannerIcon from "@mui/icons-material/QrCodeScanner";
 import CaneCard from "./CaneCard";
-import type { Cane, Order, Plant } from "../lib/api";
+import type { Cane, Me, Order, Plant } from "../lib/api";
 
 type Props = {
   order: Order;
   plant: Plant;
+  me: Me;
   idleDeadlines: Record<number, number>;
   startingCaneId: number | null;
   onStart: (caneId: number) => void;
@@ -25,6 +27,7 @@ const terminal = new Set<Cane["status"]>([
 export default function ProgressScreen({
   order,
   plant,
+  me,
   idleDeadlines,
   startingCaneId,
   onStart,
@@ -54,34 +57,45 @@ export default function ProgressScreen({
         className="p-5 sm:p-6"
       >
         <div className="flex items-start justify-between gap-4 flex-wrap">
-          <div>
-            <Typography
-              variant="overline"
-              sx={{ color: "text.secondary", letterSpacing: 2 }}
-            >
-              {plant.name}
-            </Typography>
-            <Typography variant="h6" sx={{ fontWeight: 700, lineHeight: 1.2 }}>
-              {allTerminal ? "Session complete" : "In progress"}
-            </Typography>
+          <div className="flex items-start gap-2">
+            {allTerminal && (
+              <IconButton
+                size="small"
+                onClick={onDone}
+                sx={{ mt: 0.25, color: "text.secondary" }}
+                aria-label="Back"
+              >
+                <ArrowBackRoundedIcon fontSize="small" />
+              </IconButton>
+            )}
+            <div>
+              <Typography
+                variant="overline"
+                sx={{ color: "text.secondary", letterSpacing: 2 }}
+              >
+                {plant.name}
+              </Typography>
+              <Typography variant="h6" sx={{ fontWeight: 700, lineHeight: 1.2 }}>
+                {allTerminal ? "Session complete" : "In progress"}
+              </Typography>
 
-            {/* Session summary chips */}
-            <div className="flex flex-wrap gap-2 mt-2">
-              <Chip
-                label={`${order.canes.length} ${order.canes.length === 1 ? "cane" : "canes"}`}
-                size="small"
-                sx={{ bgcolor: "#F6F8F9", color: "text.secondary", fontWeight: 600 }}
-              />
-              <Chip
-                label={`${order.total_litres.toFixed(2)} L`}
-                size="small"
-                sx={{ bgcolor: "#E8F6FB", color: "#074E66", fontWeight: 600 }}
-              />
-              <Chip
-                label={`PKR ${order.total_price.toFixed(2)}`}
-                size="small"
-                sx={{ bgcolor: "#F6F8F9", color: "text.secondary", fontWeight: 600 }}
-              />
+              <div className="flex flex-wrap gap-2 mt-2">
+                <Chip
+                  label={`${order.canes.length} ${order.canes.length === 1 ? "cane" : "canes"}`}
+                  size="small"
+                  sx={{ bgcolor: "#F6F8F9", color: "text.secondary", fontWeight: 600 }}
+                />
+                <Chip
+                  label={`${order.total_litres.toFixed(2)} L`}
+                  size="small"
+                  sx={{ bgcolor: "#E8F6FB", color: "#074E66", fontWeight: 600 }}
+                />
+                <Chip
+                  label={`${me.currency} ${order.total_price.toFixed(2)} reserved`}
+                  size="small"
+                  sx={{ bgcolor: "#FFFBEB", color: "#92400E", fontWeight: 600 }}
+                />
+              </div>
             </div>
           </div>
 

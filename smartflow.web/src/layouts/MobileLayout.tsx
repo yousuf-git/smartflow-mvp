@@ -92,11 +92,13 @@ function MobileBottomNav() {
   );
 }
 
-export default function MobileLayout({ hideNav = false }: { hideNav?: boolean }) {
+export default function MobileLayout() {
+  const { pathname } = useLocation();
+  const showNav = !pathname.startsWith("/app/scan");
   return (
-    <div className={`min-h-screen bg-paper ${!hideNav ? "pb-24" : ""}`}>
+    <div className={`min-h-screen bg-paper ${showNav ? "pb-24" : ""}`}>
       <Outlet />
-      {!hideNav && <MobileBottomNav />}
+      {showNav && <MobileBottomNav />}
     </div>
   );
 }

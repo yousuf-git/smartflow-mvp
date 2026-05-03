@@ -14,13 +14,11 @@ import {
   TextField,
   Typography,
 } from "@mui/material";
-import { useNavigate } from "react-router-dom";
 import {
   ArrowUpRight,
   ArrowDownRight,
   Droplets,
   Filter,
-  Plus,
   History,
   ChevronDown,
   ChevronUp,
@@ -168,7 +166,6 @@ const PERIODS: { key: Period; label: string }[] = [
 ];
 
 export default function CustomerTransactions() {
-  const navigate = useNavigate();
   const [tab, setTab] = useState(0);
   const [txs, setTxs] = useState<CustomerTransaction[]>([]);
   const [purchases, setPurchases] = useState<CustomerPurchase[]>([]);
@@ -210,11 +207,6 @@ export default function CustomerTransactions() {
         icon={History}
         title="History"
         subtitle="Wallet and dispense activity"
-        action={
-          <Button size="small" variant="contained" startIcon={<Plus className="w-3.5 h-3.5" />} onClick={() => navigate("/app/top-up")} sx={{ textTransform: "none", borderRadius: 2 }}>
-            Top up
-          </Button>
-        }
       />
 
       <div className="mb-3 flex items-center justify-between gap-3">

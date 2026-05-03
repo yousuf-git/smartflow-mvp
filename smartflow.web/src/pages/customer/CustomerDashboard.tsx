@@ -10,6 +10,7 @@ import {
   ArrowDownRight,
   ArrowRight,
   TimerReset,
+  CirclePlus,
 } from "lucide-react";
 import { useAuth } from "../../contexts/AuthContext";
 import {
@@ -73,15 +74,23 @@ export default function CustomerDashboard() {
       >
         <div className="absolute inset-y-0 right-0 w-28 bg-gradient-to-l from-cyan-50 to-transparent" />
         <div className="flex items-center justify-between mb-4">
-          <div>
-            <p className="text-sm text-slate-500">Wallet Balance</p>
-            <h2 className="text-3xl font-bold text-ink-900">
-              {dash.currency} {dash.balance.toFixed(2)}
-            </h2>
+          <div className="flex items-center gap-3">
+            <div className="w-12 h-12 rounded-2xl bg-aqua-50 flex items-center justify-center shrink-0">
+              <Wallet className="w-6 h-6 text-aqua-600" />
+            </div>
+            <div>
+              <p className="text-sm text-slate-500">Wallet Balance</p>
+              <h2 className="text-3xl font-bold text-ink-900">
+                {dash.currency} {dash.balance.toFixed(2)}
+              </h2>
+            </div>
           </div>
-          <div className="w-12 h-12 rounded-2xl bg-aqua-50 flex items-center justify-center z-10">
-            <Wallet className="w-6 h-6 text-aqua-600" />
-          </div>
+          <IconButton
+            onClick={() => navigate("/app/top-up")}
+            sx={{ bgcolor: "#E8F6FB", "&:hover": { bgcolor: "#D1EEF5" }, zIndex: 10 }}
+          >
+            <CirclePlus className="w-6 h-6 text-aqua-600" />
+          </IconButton>
         </div>
         {dash.hold_balance > 0 && (
           <p className="text-sm text-amber-600">
