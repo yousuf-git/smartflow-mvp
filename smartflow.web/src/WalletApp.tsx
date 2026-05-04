@@ -315,6 +315,7 @@ export default function WalletApp() {
           <ProgressScreen
             order={screen.order}
             plant={plant}
+            me={me}
             idleDeadlines={idleDeadlines}
             startingCaneId={screen.startingCaneId}
             onStart={onStart}
