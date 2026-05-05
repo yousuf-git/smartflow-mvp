@@ -354,7 +354,7 @@ export default function CustomerTransactions() {
           </div>
         </DialogTitle>
         <DialogContent sx={{ p: 3, pt: 1 }}>
-          <div className="space-y-5 mt-4">
+          <div className="space-y-6 mt-4">
             <TextField
               label="Starting From"
               type="date"
