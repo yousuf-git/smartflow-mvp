@@ -1,5 +1,5 @@
 import { useEffect, useRef } from "react";
-import { Button, Chip, CircularProgress, Paper, Typography } from "@mui/material";
+import { Button, CircularProgress, Typography } from "@mui/material";
 import PlayArrowRoundedIcon from "@mui/icons-material/PlayArrowRounded";
 import StopRoundedIcon from "@mui/icons-material/StopRounded";
 import CheckRoundedIcon from "@mui/icons-material/CheckRounded";
@@ -58,124 +58,157 @@ export default function CaneCard({
   const stateStyle = cardState(cane.status) ?? cardState("pending")!;
 
   return (
-    <Paper
-      elevation={0}
-      sx={{
-        border: "1px solid #EDF0F2",
-        borderRadius: 3,
-        overflow: "hidden",
-        position: "relative",
-      }}
-      className="p-0"
-    >
+    <div className="relative overflow-hidden bg-white rounded-3xl border border-slate-100 shadow-sm transition-all duration-300">
+      {/* Background Fill Layer */}
       <div
         ref={fillRef}
         aria-hidden
+        className="absolute left-0 top-0 bottom-0 opacity-10"
         style={{
-          position: "absolute",
-          left: 0,
-          top: 0,
-          bottom: 0,
           width: "0%",
-          background: stateStyle.fillGradient,
+          background: stateStyle.fillColor,
           transition: "background 0.3s ease",
         }}
       />
-      <div className="relative z-10 p-4 flex flex-col gap-3">
+      
+      {/* Subtle Bottom Border Progress (More Modern) */}
+      <div
+        ref={fillRef}
+        aria-hidden
+        className="absolute left-0 bottom-0 h-1 rounded-full"
+        style={{
+          width: "0%",
+          background: stateStyle.fillColor,
+          transition: "background 0.3s ease",
+        }}
+      />
+
+      <div className="relative z-10 p-5 flex flex-col gap-4">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <Chip
-              label={tapLabel}
-              size="small"
-              sx={{ bgcolor: "#0F8CB0", color: "#fff", fontWeight: 600 }}
-            />
-            <Typography variant="body2" sx={{ fontWeight: 600 }}>
+            <div className="px-2.5 py-1 bg-slate-900 text-white text-[10px] font-black rounded-lg uppercase tracking-wider">
+              {tapLabel}
+            </div>
+            <Typography variant="body2" sx={{ fontWeight: 600, color: "#64748B" }}>
               Cane {cane.cane_number}
             </Typography>
           </div>
-          <Chip
-            icon={stateStyle.icon}
-            label={stateStyle.label}
-            size="small"
-            sx={{
-              bgcolor: stateStyle.chipBg,
-              color: stateStyle.chipFg,
-              fontWeight: 600,
-            }}
-          />
-        </div>
-
-        <div className="flex items-baseline gap-1" style={{ fontFamily: "Inter" }}>
-          <span
-            ref={numRef}
-            style={{
-              fontSize: 40,
-              fontWeight: 600,
-              letterSpacing: "-0.02em",
-              fontVariantNumeric: "tabular-nums",
+          
+          <div 
+            className="flex items-center gap-1.5 px-3 py-1 rounded-full border"
+            style={{ 
+              backgroundColor: `${stateStyle.fillColor}10`,
+              borderColor: `${stateStyle.fillColor}20`,
+              color: stateStyle.fillColor 
             }}
           >
-            0.00
-          </span>
-          <Typography variant="body2" sx={{ color: "text.secondary" }}>
-            of {cane.litres_requested.toFixed(2)} L · PKR {cane.price.toFixed(2)}
-          </Typography>
+            {stateStyle.icon && <span className="scale-75 origin-center">{stateStyle.icon}</span>}
+            <span className="text-[11px] font-bold uppercase tracking-tight">
+              {stateStyle.label}
+            </span>
+          </div>
         </div>
 
-        {cane.reason ? (
-          <Typography variant="body2" sx={{ color: "text.secondary" }}>
-            {cane.reason}
-          </Typography>
-        ) : null}
+        <div className="flex flex-col gap-0.5">
+          <div className="flex items-baseline gap-2">
+            <span
+              ref={numRef}
+              className="text-4xl font-black tracking-tight text-slate-900 font-mono"
+              style={{ fontVariantNumeric: "tabular-nums" }}
+            >
+              0.00
+            </span>
+            <span className="text-xl font-bold text-slate-400">L</span>
+          </div>
+          <div className="flex items-center gap-1.5 text-xs font-semibold text-slate-500">
+            <span>Target: {cane.litres_requested.toFixed(2)} L</span>
+            <span className="w-1 h-1 rounded-full bg-slate-300" />
+            <span>PKR {cane.price.toFixed(2)}</span>
+          </div>
+        </div>
 
-        <div className="flex items-center justify-between gap-2">
+        {cane.reason && (
+          <div className="px-3 py-2 bg-amber-50 border border-amber-100 rounded-xl text-[11px] font-medium text-amber-700">
+            {cane.reason}
+          </div>
+        )}
+
+        <div className="flex items-center justify-between mt-1">
           {cane.status === "pending" && (
             <Button
               variant="contained"
+              fullWidth
               startIcon={
                 startPending ? (
-                  <CircularProgress size={14} color="inherit" />
+                  <CircularProgress size={16} color="inherit" thickness={6} />
                 ) : (
                   <PlayArrowRoundedIcon />
                 )
               }
               onClick={onStart}
               disabled={!canStart || startPending}
-              sx={{ textTransform: "none", fontWeight: 600 }}
+              sx={{ 
+                textTransform: "none", 
+                fontWeight: 700,
+                borderRadius: "14px",
+                py: 1,
+                bgcolor: "#00A3FF",
+                boxShadow: "0 4px 12px rgba(0, 163, 255, 0.2)",
+                "&:hover": { bgcolor: "#0086D1" },
+                "&.Mui-disabled": { bgcolor: "#F1F5F9", color: "#94A3B8" }
+              }}
             >
-              {startPending ? "Waiting for tap…" : "Start"}
+              {startPending ? "Preparing Tap..." : "Start Fill"}
             </Button>
           )}
+          
           {cane.status === "started" && (
             <Button
-              variant="outlined"
+              variant="contained"
+              fullWidth
               color="error"
               startIcon={<StopRoundedIcon />}
               onClick={onStop}
-              sx={{ textTransform: "none", fontWeight: 600 }}
+              sx={{ 
+                textTransform: "none", 
+                fontWeight: 700,
+                borderRadius: "14px",
+                py: 1,
+                bgcolor: "#EF4444",
+                boxShadow: "0 4px 12px rgba(239, 68, 68, 0.2)",
+                "&:hover": { bgcolor: "#DC2626" }
+              }}
             >
-              Stop
+              Stop Dispensing
             </Button>
           )}
+
           {(cane.status === "completed" ||
             cane.status === "partial_completed" ||
             cane.status === "failed" ||
             cane.status === "cancelled") && (
-            <Typography variant="body2" sx={{ color: "text.secondary" }}>
-              {cane.status === "completed" && "Filled successfully."}
-              {cane.status === "partial_completed" && "Stopped early — partial amount kept."}
-              {cane.status === "failed" && "Failed — unused credit returned."}
-              {cane.status === "cancelled" && "Cancelled - credit returned."}
-            </Typography>
-          )}
-          {cane.status === "pending" && cane.retry_count > 0 && (
-            <Typography variant="caption" sx={{ color: "text.secondary" }}>
-              Attempt {cane.retry_count + 1}
-            </Typography>
+            <div className="flex items-center gap-2 text-slate-500 w-full">
+              <div className="flex-1 h-px bg-slate-100" />
+              <span className="text-[10px] font-bold uppercase tracking-widest text-slate-400">
+                {cane.status === "completed" && "Success"}
+                {cane.status === "partial_completed" && "Stopped"}
+                {cane.status === "failed" && "Error"}
+                {cane.status === "cancelled" && "Cancelled"}
+              </span>
+              <div className="flex-1 h-px bg-slate-100" />
+            </div>
           )}
         </div>
+
+        {cane.status === "pending" && cane.retry_count > 0 && (
+          <div className="text-center">
+            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-tighter">
+              Retrying (Attempt {cane.retry_count + 1})
+            </span>
+          </div>
+        )}
       </div>
-    </Paper>
+    </div>
   );
 }
 
@@ -184,50 +217,39 @@ function cardState(status: Cane["status"]) {
     case "pending":
       return {
         label: "Queued",
-        chipBg: "#EDF0F2",
-        chipFg: "#3A464C",
+        fillColor: "#64748B",
         icon: undefined,
-        fillGradient: "linear-gradient(90deg, rgba(237,240,242,0), rgba(237,240,242,0.4))",
       };
     case "started":
       return {
         label: "Pouring",
-        chipBg: "#0F8CB0",
-        chipFg: "#fff",
-        icon: undefined,
-        fillGradient: "linear-gradient(90deg, rgba(94,197,217,0.25), rgba(15,140,176,0.45))",
+        fillColor: "#00A3FF",
+        icon: <div className="w-1.5 h-1.5 rounded-full bg-current animate-pulse" />,
       };
     case "completed":
       return {
         label: "Complete",
-        chipBg: "#3B7A57",
-        chipFg: "#fff",
-        icon: <CheckRoundedIcon />,
-        fillGradient: "linear-gradient(90deg, rgba(59,122,87,0.20), rgba(59,122,87,0.30))",
+        fillColor: "#10B981",
+        icon: <CheckRoundedIcon sx={{ fontSize: 14 }} />,
       };
     case "partial_completed":
       return {
         label: "Stopped",
-        chipBg: "#D97757",
-        chipFg: "#fff",
-        icon: <StopRoundedIcon />,
-        fillGradient: "linear-gradient(90deg, rgba(217,119,87,0.2), rgba(217,119,87,0.3))",
+        fillColor: "#F59E0B",
+        icon: <StopRoundedIcon sx={{ fontSize: 14 }} />,
       };
     case "failed":
       return {
         label: "Failed",
-        chipBg: "#B03A2E",
-        chipFg: "#fff",
-        icon: <ErrorOutlineRoundedIcon />,
-        fillGradient: "linear-gradient(90deg, rgba(176,58,46,0.18), rgba(176,58,46,0.28))",
+        fillColor: "#EF4444",
+        icon: <ErrorOutlineRoundedIcon sx={{ fontSize: 14 }} />,
       };
     case "cancelled":
       return {
         label: "Cancelled",
-        chipBg: "#9AA3A8",
-        chipFg: "#fff",
-        icon: <CancelRoundedIcon />,
-        fillGradient: "linear-gradient(90deg, rgba(154,163,168,0.18), rgba(154,163,168,0.28))",
+        fillColor: "#94A3B8",
+        icon: <CancelRoundedIcon sx={{ fontSize: 14 }} />,
       };
   }
 }
+
