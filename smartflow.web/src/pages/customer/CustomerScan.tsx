@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { CircularProgress } from "@mui/material";
+import { motion } from "framer-motion";
 import WalletHeader from "../../components/WalletHeader";
 import CaneBuilder, { type DraftCane } from "../../components/CaneBuilder";
 import ProgressScreen from "../../components/ProgressScreen";
@@ -301,41 +302,66 @@ export default function CustomerScan() {
     );
   }
 
+  const containerVariants = {
+    hidden: { opacity: 0 },
+    visible: {
+      opacity: 1,
+      transition: {
+        staggerChildren: 0.1,
+      },
+    },
+  };
+
+  const itemVariants = {
+    hidden: { y: 15, opacity: 0 },
+    visible: { y: 0, opacity: 1 },
+  };
+
   return (
-    <div className="min-h-full w-full flex items-start justify-center p-4 sm:p-6">
-      <main className="w-full max-w-3xl flex flex-col gap-4">
+    <motion.div
+      initial="hidden"
+      animate="visible"
+      variants={containerVariants}
+      className="relative min-h-screen pb-10 overflow-x-hidden"
+    >
+      {/* Ambient Background */}
+      <div className="absolute top-0 left-0 right-0 h-64 bg-gradient-to-b from-slate-50 to-transparent -z-10" />
+      <div className="absolute top-[-5%] right-[-10%] w-64 h-64 bg-pure-aqua/5 blur-[100px] rounded-full -z-10" />
+
+      <div className="px-5 pt-8">
         {(screen.kind === "home" || screen.kind === "submitting") && (
-          <WalletHeader
-            me={me}
-            activeOrder={null}
-          />
+          <motion.div variants={itemVariants} className="mb-6">
+             <WalletHeader me={me} activeOrder={null} />
+          </motion.div>
         )}
 
-        {screen.kind === "home" || screen.kind === "submitting" ? (
-          <CaneBuilder
-            plant={plant}
-            me={me}
-            draft={draft}
-            onChange={setDraft}
-            onConfirm={onConfirm}
-            onBack={backToScan}
-            submitting={screen.kind === "submitting"}
-          />
-        ) : (
-          <ProgressScreen
-            order={screen.order}
-            plant={plant}
-            me={me}
-            idleDeadlines={idleDeadlines}
-            startingCaneId={screen.startingCaneId}
-            onStart={onStart}
-            onStop={onStop}
-            onCancel={onCancel}
-            onDone={resetToHome}
-          />
-        )}
-      </main>
+        <motion.div variants={itemVariants} className="w-full">
+          {screen.kind === "home" || screen.kind === "submitting" ? (
+            <CaneBuilder
+              plant={plant}
+              me={me}
+              draft={draft}
+              onChange={setDraft}
+              onConfirm={onConfirm}
+              onBack={backToScan}
+              submitting={screen.kind === "submitting"}
+            />
+          ) : (
+            <ProgressScreen
+              order={screen.order}
+              plant={plant}
+              me={me}
+              idleDeadlines={idleDeadlines}
+              startingCaneId={screen.startingCaneId}
+              onStart={onStart}
+              onStop={onStop}
+              onCancel={onCancel}
+              onDone={resetToHome}
+            />
+          )}
+        </motion.div>
+      </div>
       <Toast {...toastProps} />
-    </div>
+    </motion.div>
   );
 }

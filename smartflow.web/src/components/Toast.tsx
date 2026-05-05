@@ -30,9 +30,14 @@ export default function Toast({ open, message, severity, onClose, duration = 400
         variant="filled"
         sx={{
           width: "100%",
-          borderRadius: 2,
-          boxShadow: "0 4px 20px rgba(0,0,0,0.18)",
+          borderRadius: '16px',
+          boxShadow: "0 12px 32px -8px rgba(0,0,0,0.15)",
           alignItems: "center",
+          fontWeight: 600,
+          fontSize: '0.85rem',
+          px: 2,
+          py: 0.5,
+          '& .MuiAlert-icon': { fontSize: '20px' }
         }}
       >
         {message}

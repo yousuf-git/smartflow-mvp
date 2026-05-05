@@ -1,17 +1,13 @@
 import { useCallback, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import {
   Button,
-  Dialog,
-  DialogContent,
-  DialogTitle,
   Divider,
-  IconButton,
   Paper,
   Typography,
 } from "@mui/material";
-import QrCodeScannerIcon from "@mui/icons-material/QrCodeScanner";
-import CloseIcon from "@mui/icons-material/Close";
-import CameraScanner from "./CameraScanner";
+import { QrCode, ArrowLeft } from "lucide-react";
+import QRScannerModal from "./QRScannerModal";
 import Toast from "./Toast";
 import { useToast } from "../lib/useToast";
 import type { Catalogue, Plant, Tap } from "../lib/api";
@@ -25,6 +21,7 @@ type Props = {
 };
 
 export default function QRScanScreen({ catalogue, onScanned, onBypass }: Props) {
+  const navigate = useNavigate();
   const [scanOpen, setScanOpen] = useState(false);
   const { toastProps, showToast } = useToast();
 
@@ -64,39 +61,38 @@ export default function QRScanScreen({ catalogue, onScanned, onBypass }: Props) 
     <>
       <Paper
         elevation={0}
-        sx={{ border: "1px solid #EDF0F2", borderRadius: 3 }}
-        className="p-8 sm:p-10"
+        sx={{ border: "1px solid #F1F5F9", borderRadius: '28px' }}
+        className="p-8 sm:p-10 bg-white shadow-sm relative overflow-hidden"
       >
-        <div className="flex flex-col items-center gap-6 text-center">
-          {/* Brand */}
-          <div>
-            <Typography
-              variant="overline"
-              sx={{ color: "primary.main", fontWeight: 700, letterSpacing: 3 }}
-            >
-              SmartFlow
-            </Typography>
-          </div>
+        {/* Navigation */}
+        <div className="absolute top-6 left-6">
+           <button
+              onClick={() => navigate(-1)}
+              className="w-10 h-10 rounded-xl bg-slate-50 border border-slate-100 flex items-center justify-center text-slate-500 active:scale-90 transition-all"
+           >
+              <ArrowLeft className="w-5 h-5" />
+           </button>
+        </div>
 
+        <div className="flex flex-col items-center gap-6 text-center pt-10">
           {/* Icon */}
           <div
-            className="flex items-center justify-center rounded-full"
-            style={{ width: 88, height: 88, background: "#E8F6FB" }}
+            className="flex items-center justify-center rounded-3xl"
+            style={{ width: 88, height: 88, background: "#F0F9FF" }}
           >
-            <QrCodeScannerIcon sx={{ fontSize: 48, color: "#0F8CB0" }} />
+            <QrCode style={{ fontSize: 48, width: 48, height: 48 }} className="text-pure-aqua" />
           </div>
 
           {/* Headline */}
           <div>
-            <Typography variant="h5" sx={{ fontWeight: 700 }}>
+            <Typography variant="h5" sx={{ fontWeight: 600, tracking: '-0.01em' }}>
               Start your fill
             </Typography>
             <Typography
               variant="body2"
-              sx={{ color: "text.secondary", mt: 1, maxWidth: 320, lineHeight: 1.6 }}
+              sx={{ color: "text.secondary", mt: 1, maxWidth: 300, lineHeight: 1.6, fontWeight: 500 }}
             >
-              Scan the QR code at your tap. It tells the system which station
-              you're at so your session is set up automatically.
+              Scan the QR code at your tap to automatically set up your session.
             </Typography>
           </div>
 
@@ -104,22 +100,25 @@ export default function QRScanScreen({ catalogue, onScanned, onBypass }: Props) 
           <Button
             variant="contained"
             size="large"
-            startIcon={<QrCodeScannerIcon />}
+            startIcon={<QrCode size={20} />}
             onClick={() => setScanOpen(true)}
             disabled={!catalogue}
             sx={{
-              height: 52,
+              height: 56,
               fontWeight: 600,
               textTransform: "none",
-              minWidth: 200,
-              borderRadius: 2,
+              minWidth: 220,
+              borderRadius: 4,
+              bgcolor: '#00A3FF',
+              boxShadow: '0 8px 16px -4px rgba(0, 163, 255, 0.25)',
+              '&:hover': { bgcolor: '#008BD9' }
             }}
           >
             Scan QR Code
           </Button>
 
           <Divider sx={{ width: "100%" }}>
-            <Typography variant="caption" sx={{ color: "text.secondary", px: 1 }}>
+            <Typography variant="caption" sx={{ color: "text.disabled", px: 1, fontWeight: 700, textTransform: 'uppercase' }}>
               or
             </Typography>
           </Divider>
@@ -131,49 +130,29 @@ export default function QRScanScreen({ catalogue, onScanned, onBypass }: Props) 
               size="medium"
               onClick={onBypass}
               disabled={!catalogue}
-              sx={{ textTransform: "none", minWidth: 200, borderRadius: 2 }}
+              sx={{
+                textTransform: "none",
+                minWidth: 220,
+                borderRadius: 4,
+                borderWidth: 1,
+                fontWeight: 600,
+                borderColor: '#E2E8F0',
+                color: 'text.secondary',
+                '&:hover': { borderWidth: 1, borderColor: '#CBD5E1', bgcolor: '#F8FAFC' }
+              }}
             >
-              Use defaults
+              Use Manual Selection
             </Button>
-
-            {/* <Button
-              variant="text"
-              size="small"
-              startIcon={printing ? <CircularProgress size={14} /> : <PrintOutlinedIcon />}
-              onClick={() => void handlePrint()}
-              disabled={!catalogue || printing}
-              sx={{ textTransform: "none", color: "text.secondary" }}
-            >
-              Print test QR
-            </Button> */}
           </div>
         </div>
       </Paper>
 
-      {/* Camera dialog */}
-      <Dialog
+      <QRScannerModal
         open={scanOpen}
         onClose={() => setScanOpen(false)}
-        maxWidth="xs"
-        fullWidth
-      >
-        <DialogTitle
-          sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", pb: 1 }}
-        >
-          <span>Scan QR Code</span>
-          <IconButton size="small" onClick={() => setScanOpen(false)}>
-            <CloseIcon fontSize="small" />
-          </IconButton>
-        </DialogTitle>
-        <DialogContent sx={{ pb: 3 }}>
-          <Typography variant="body2" sx={{ color: "text.secondary", mb: 2 }}>
-            Hold your phone steady over the QR code on the water tap label.
-          </Typography>
-          {scanOpen && (
-            <CameraScanner onResult={handleResult} onError={handleCameraError} />
-          )}
-        </DialogContent>
-      </Dialog>
+        onResult={handleResult}
+        onError={handleCameraError}
+      />
 
       <Toast {...toastProps} />
     </>

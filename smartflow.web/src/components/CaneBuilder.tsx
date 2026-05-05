@@ -1,24 +1,18 @@
 import { useCallback, useMemo, useState } from "react";
 import {
-  Button,
-  Chip,
-  Dialog,
-  DialogContent,
-  DialogTitle,
-  Divider,
-  IconButton,
   InputAdornment,
-  Paper,
   TextField,
-  Typography,
 } from "@mui/material";
-import AddIcon from "@mui/icons-material/Add";
-import ArrowBackRoundedIcon from "@mui/icons-material/ArrowBackRounded";
-import DeleteOutlineIcon from "@mui/icons-material/DeleteOutlined";
-import WaterDropOutlinedIcon from "@mui/icons-material/WaterDropOutlined";
-import QrCodeScannerIcon from "@mui/icons-material/QrCodeScanner";
-import CloseIcon from "@mui/icons-material/Close";
-import CameraScanner from "./CameraScanner";
+import {
+  Plus,
+  ArrowLeft,
+  Trash2,
+  QrCode,
+  Zap,
+  Info
+} from "lucide-react";
+import { motion } from "framer-motion";
+import QRScannerModal from "./QRScannerModal";
 import Toast from "./Toast";
 import { useToast } from "../lib/useToast";
 import type { Plant, Me } from "../lib/api";
@@ -167,204 +161,183 @@ export default function CaneBuilder({
   const canAddTap = derived.activeTapIds.length < MAX_TAPS_PER_PURCHASE && !submitting;
   const activeTaps = plant.taps.filter((t) => derived.activeTapIds.includes(t.id));
 
+  const containerVariants = {
+    hidden: { opacity: 0 },
+    visible: { opacity: 1, transition: { staggerChildren: 0.1 } }
+  };
+
+  const itemVariants = {
+    hidden: { opacity: 0, y: 15 },
+    visible: { opacity: 1, y: 0 }
+  };
+
   return (
-    <Paper
-      elevation={0}
-      sx={{ border: "1px solid #EDF0F2", borderRadius: 3 }}
-      className="p-5 sm:p-6"
+    <motion.div
+      initial="hidden"
+      animate="visible"
+      variants={containerVariants}
+      className="flex flex-col gap-6"
     >
-      {/* Header */}
-      <div className="flex items-start gap-2">
-        <IconButton
-          size="small"
-          onClick={onBack}
-          disabled={submitting}
-          sx={{ mt: 0.25, color: "text.secondary" }}
-          aria-label="Back to scan"
-        >
-          <ArrowBackRoundedIcon fontSize="small" />
-        </IconButton>
+      {/* Page Header */}
+      <motion.div variants={itemVariants} className="flex items-center gap-4">
+         <button
+            onClick={onBack}
+            disabled={submitting}
+            className="w-11 h-11 rounded-2xl bg-white border border-slate-100 shadow-sm flex items-center justify-center text-slate-600 active:scale-90 transition-all disabled:opacity-50"
+         >
+            <ArrowLeft className="w-5 h-5" />
+         </button>
+         <div>
+            <h2 className="text-xl font-semibold text-slate-900 tracking-tight leading-none mb-1.5">Configure Fill</h2>
+            <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-widest">{plant.name}</p>
+         </div>
+      </motion.div>
 
-        <div className="flex-1">
-          <Typography
-            variant="overline"
-            sx={{ color: "text.secondary", letterSpacing: 2 }}
-          >
-            {plant.name}
-          </Typography>
-          <Typography variant="h6" sx={{ fontWeight: 700, lineHeight: 1.2 }}>
-            Fill your canes
-          </Typography>
+      {/* Info Card */}
+      <motion.div variants={itemVariants} className="bg-pure-aqua/5 rounded-[24px] p-4 flex items-center gap-3 border border-pure-aqua/10">
+         <div className="w-10 h-10 rounded-xl bg-pure-aqua/10 flex items-center justify-center text-pure-aqua">
+            <Zap className="w-5 h-5" />
+         </div>
+         <div className="flex-1">
+            <p className="text-[10px] font-semibold text-slate-500 uppercase tracking-widest">Pricing Model</p>
+            <p className="text-sm font-semibold text-slate-900">{me.currency} {me.price_per_litre.toFixed(2)} / Litre</p>
+         </div>
+      </motion.div>
 
-          <div className="flex flex-wrap items-center gap-2 mt-2">
-            <Chip
-              icon={<WaterDropOutlinedIcon style={{ fontSize: 14 }} />}
-              label={`${me.currency} ${me.price_per_litre.toFixed(2)} / L`}
-              size="small"
-              sx={{ bgcolor: "#E8F6FB", color: "#074E66", fontWeight: 600 }}
-            />
-          </div>
-          <Typography variant="caption" sx={{ color: "text.secondary", mt: 0.5, display: "block" }}>
-            Up to {MAX_CANES_PER_TAP} canes per tap · {MAX_TAPS_PER_PURCHASE} taps per session
-          </Typography>
-        </div>
-      </div>
-
-      <Divider sx={{ my: 3 }} />
-
-      {/* Tap sections */}
+      {/* Tap List */}
       <div className="flex flex-col gap-4">
         {activeTaps.map((tap) => {
           const tapCanes = draft.filter((c) => c.tap_id === tap.id);
           const canAddCane = tapCanes.length < MAX_CANES_PER_TAP && !submitting;
           return (
-            <div key={tap.id} className="rounded-xl p-3" style={{ background: "#F6F8F9" }}>
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <Chip
-                    label={tap.label}
-                    size="small"
-                    sx={{ bgcolor: "#0F8CB0", color: "#fff", fontWeight: 600 }}
-                  />
-                  <Typography variant="body2" sx={{ color: "text.secondary" }}>
-                    {tapCanes.length}/{MAX_CANES_PER_TAP} canes
-                  </Typography>
+            <motion.div
+              key={tap.id}
+              variants={itemVariants}
+              className="bg-white border border-slate-100 rounded-[28px] p-5 shadow-sm"
+            >
+              <div className="flex items-center justify-between mb-5">
+                <div className="flex items-center gap-3">
+                  <div className="w-9 h-9 rounded-xl bg-slate-900 flex items-center justify-center text-white text-[11px] font-semibold">
+                     {tap.label}
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-semibold text-slate-900">Active Tap</h3>
+                    <p className="text-[10px] font-medium text-slate-400 uppercase tracking-tighter">{tapCanes.length} of {MAX_CANES_PER_TAP} Canes Ready</p>
+                  </div>
                 </div>
-                <Button
-                  size="small"
-                  startIcon={<AddIcon />}
+                <button
                   disabled={!canAddCane}
                   onClick={() => addCane(tap.id)}
-                  sx={{ textTransform: "none" }}
+                  className="flex items-center gap-1.5 text-xs font-semibold text-pure-aqua py-2 px-3 rounded-xl bg-pure-aqua/5 active:scale-95 transition-all disabled:opacity-30"
                 >
-                  Add cane
-                </Button>
+                  <Plus className="w-3.5 h-3.5" /> Add Cane
+                </button>
               </div>
 
-              <div className="mt-2 flex flex-col gap-2">
+              <div className="flex flex-col gap-3">
                 {tapCanes.map((c, idx) => (
-                  <div key={c.key} className="flex items-center gap-2">
-                    <Chip
-                      label={`Cane ${idx + 1}`}
-                      size="small"
-                      variant="outlined"
-                      sx={{ bgcolor: "#fff" }}
-                    />
-                    <TextField
-                      type="number"
-                      size="small"
-                      value={c.litres}
-                      onChange={(e) => updateLitres(c.key, e.target.value)}
-                      disabled={submitting}
-                      slotProps={{
-                        input: {
-                          endAdornment: (
-                            <InputAdornment position="end">
-                              <WaterDropOutlinedIcon color="primary" fontSize="small" />
-                              <span className="ml-1 text-sm">L</span>
-                            </InputAdornment>
-                          ),
-                          inputProps: { min: 1, max: MAX_LITRES_PER_CANE, step: 1 },
-                        },
-                      }}
-                      sx={{ flex: 1, bgcolor: "#fff", borderRadius: 1 }}
-                    />
-                    <Typography
-                      variant="body2"
-                      sx={{ color: "text.secondary", minWidth: 72, textAlign: "right" }}
-                    >
-                      {me.currency} {(Number(c.litres || 0) * me.price_per_litre).toFixed(2)}
-                    </Typography>
-                    <IconButton
-                      aria-label="Remove cane"
-                      size="small"
+                  <div
+                    key={c.key}
+                    className="flex items-center gap-3 p-3 rounded-2xl bg-slate-50 border border-slate-100/50"
+                  >
+                    <div className="w-8 h-8 rounded-xl bg-white border border-slate-100 flex items-center justify-center text-[10px] font-semibold text-slate-400">
+                       #{idx + 1}
+                    </div>
+                    <div className="flex-1">
+                       <TextField
+                        type="number"
+                        size="small"
+                        value={c.litres}
+                        onChange={(e) => updateLitres(c.key, e.target.value)}
+                        disabled={submitting}
+                        slotProps={{
+                          input: {
+                            endAdornment: (
+                              <InputAdornment position="end">
+                                <span className="text-[10px] font-semibold text-slate-300 uppercase">Ltrs</span>
+                              </InputAdornment>
+                            ),
+                            sx: { borderRadius: '12px', bgcolor: 'white', fontWeight: 600, fontSize: '0.9rem' }
+                          },
+                        }}
+                        fullWidth
+                      />
+                    </div>
+                    <div className="text-right min-w-[60px]">
+                       <p className="text-xs font-semibold text-slate-900">{me.currency} {(Number(c.litres || 0) * me.price_per_litre).toFixed(2)}</p>
+                    </div>
+                    <button
                       onClick={() => removeCane(c.key)}
                       disabled={submitting}
+                      className="w-8 h-8 flex items-center justify-center text-slate-300 hover:text-red-500 active:scale-90 transition-all"
                     >
-                      <DeleteOutlineIcon />
-                    </IconButton>
+                      <Trash2 className="w-4 h-4" />
+                    </button>
                   </div>
                 ))}
               </div>
-            </div>
+            </motion.div>
           );
         })}
 
         {canAddTap && (
-          <Button
-            variant="outlined"
-            size="small"
-            startIcon={<QrCodeScannerIcon />}
+          <motion.button
+            variants={itemVariants}
             onClick={() => setAddTapOpen(true)}
-            sx={{ textTransform: "none", borderStyle: "dashed", alignSelf: "flex-start" }}
+            className="w-full py-4 border-2 border-dashed border-slate-100 rounded-[24px] text-slate-400 text-xs font-semibold uppercase tracking-widest flex items-center justify-center gap-2 hover:bg-slate-50 transition-all"
           >
-            Add another tap
-          </Button>
+            <QrCode className="w-4 h-4" /> Add Another Tap
+          </motion.button>
         )}
       </div>
 
-      <Divider sx={{ my: 3 }} />
-
-      {/* Footer */}
-      <div className="flex items-center justify-between gap-4">
-        <div className="flex flex-col gap-1">
-          <div className="flex items-baseline gap-1.5">
-            <WaterDropOutlinedIcon color="primary" sx={{ fontSize: 18, mb: "-2px" }} />
-            <Typography variant="h6" sx={{ fontWeight: 700 }}>
-              {derived.totalLitres.toFixed(2)} L
-            </Typography>
+      {/* Summary Footer */}
+      <motion.div variants={itemVariants} className="mt-4 bg-white border border-slate-100 rounded-[32px] p-6 shadow-lg shadow-slate-200/50">
+        <div className="flex items-center justify-between mb-6">
+          <div className="flex flex-col">
+            <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-widest mb-1">Total Volume</p>
+            <div className="flex items-baseline gap-1">
+               <span className="text-2xl font-semibold text-slate-900">{derived.totalLitres.toFixed(2)}</span>
+               <span className="text-xs font-semibold text-slate-400">LITRES</span>
+            </div>
           </div>
-          <Typography variant="body2" sx={{ color: "text.secondary" }}>
-            {me.currency} {derived.totalPrice.toFixed(2)} to reserve on confirm
-          </Typography>
+          <div className="text-right">
+            <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-widest mb-1">Total Cost</p>
+            <div className="flex items-baseline justify-end gap-1">
+               <span className="text-xs font-semibold text-slate-400">{me.currency}</span>
+               <span className="text-2xl font-bold text-pure-aqua">{derived.totalPrice.toFixed(2)}</span>
+            </div>
+          </div>
         </div>
-        <Button
-          variant="contained"
-          size="large"
-          disabled={submitting || derived.errors.length > 0}
-          onClick={onConfirm}
-          sx={{ height: 52, fontWeight: 700, textTransform: "none", minWidth: 160, borderRadius: 2 }}
-        >
-          {submitting ? "Reserving…" : "Confirm"}
-        </Button>
-      </div>
 
-      {derived.errors.length > 0 && (
-        <div className="mt-3 flex flex-col gap-1">
-          {derived.errors.map((e, i) => (
-            <Typography key={i} variant="body2" sx={{ color: "error.main" }}>
-              • {e}
-            </Typography>
-          ))}
-        </div>
-      )}
+        {derived.errors.length > 0 ? (
+          <div className="bg-red-50 rounded-2xl p-4 flex gap-3 border border-red-100">
+             <Info className="w-5 h-5 text-red-500 shrink-0" />
+             <p className="text-xs font-semibold text-red-600 leading-relaxed">
+                {derived.errors[0]}
+             </p>
+          </div>
+        ) : (
+          <button
+            disabled={submitting}
+            onClick={onConfirm}
+            className="w-full py-4.5 bg-pure-aqua text-white rounded-[24px] font-semibold text-sm uppercase tracking-widest shadow-xl shadow-pure-aqua/20 flex items-center justify-center gap-2 active:scale-[0.98] transition-all"
+          >
+            {submitting ? "Reserving..." : "Confirm Purchase"}
+          </button>
+        )}
+      </motion.div>
 
-      {/* Add second tap dialog */}
-      <Dialog
+      <QRScannerModal
         open={addTapOpen}
         onClose={() => setAddTapOpen(false)}
-        maxWidth="xs"
-        fullWidth
-      >
-        <DialogTitle
-          sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", pb: 1 }}
-        >
-          <span>Add Second Tap</span>
-          <IconButton size="small" onClick={() => setAddTapOpen(false)}>
-            <CloseIcon fontSize="small" />
-          </IconButton>
-        </DialogTitle>
-        <DialogContent sx={{ pb: 3 }}>
-          <Typography variant="body2" sx={{ color: "text.secondary", mb: 2 }}>
-            Scan the QR code on the second tap you want to include in this session.
-          </Typography>
-          {addTapOpen && (
-            <CameraScanner onResult={handleAddTapScan} onError={handleAddTapError} />
-          )}
-        </DialogContent>
-      </Dialog>
+        onResult={handleAddTapScan}
+        onError={handleAddTapError}
+        title="Add Another Tap"
+        description="Scan the QR code on the second tap to include it in this dispense session."
+      />
 
       <Toast {...toastProps} />
-    </Paper>
+    </motion.div>
   );
 }
