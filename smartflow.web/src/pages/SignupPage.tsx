@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 import {
   TextField,
-  Button,
   Alert,
   CircularProgress,
   IconButton,
@@ -10,7 +9,6 @@ import {
 } from "@mui/material";
 import { motion } from "framer-motion";
 import {
-  ArrowRight,
   Check,
   Droplets,
   Eye,
@@ -19,6 +17,9 @@ import {
   Mail,
   Phone,
   User,
+  ChevronRight,
+  ShieldCheck,
+  Zap
 } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 import { api } from "../lib/api";
@@ -32,60 +33,30 @@ type CustomerTypeOption = {
   daily_litre_limit: number;
 };
 
-function WavePattern() {
-  return (
-    <div className="absolute inset-0 overflow-hidden opacity-[0.07]">
-      <svg className="absolute h-full w-[200%]" viewBox="0 0 1440 800" preserveAspectRatio="none">
-        <motion.path
-          d="M0,400 C360,300 720,500 1080,350 C1260,300 1350,400 1440,380 L1440,800 L0,800 Z"
-          fill="currentColor"
-          className="text-white"
-          animate={{
-            d: [
-              "M0,400 C360,300 720,500 1080,350 C1260,300 1350,400 1440,380 L1440,800 L0,800 Z",
-              "M0,350 C360,450 720,300 1080,400 C1260,450 1350,350 1440,370 L1440,800 L0,800 Z",
-              "M0,400 C360,300 720,500 1080,350 C1260,300 1350,400 1440,380 L1440,800 L0,800 Z",
-            ],
-          }}
-          transition={{ duration: 8, repeat: Infinity, ease: "easeInOut" }}
-        />
-      </svg>
-    </div>
-  );
-}
-
-const fieldSx = {
-  "& .MuiOutlinedInput-root": {
-    backgroundColor: "#FFFFFF",
-    borderRadius: "8px",
-  },
-  "& .MuiOutlinedInput-input": {
-    py: 1.45,
-  },
-};
-
 function formatNumber(value: number) {
   return new Intl.NumberFormat("en-PK", {
     maximumFractionDigits: 2,
   }).format(value);
 }
 
-function passwordState(password: string) {
-  if (!password) return { label: "Use at least 6 characters.", color: "bg-ink-100", width: "w-1/4" };
-  if (password.length < 6) return { label: "Too short.", color: "bg-coral", width: "w-1/3" };
-  if (password.length < 10) return { label: "Good password.", color: "bg-aqua-500", width: "w-2/3" };
-  return { label: "Strong password.", color: "bg-moss", width: "w-full" };
-}
-
-function confirmPasswordState(password: string, confirmPassword: string) {
-  if (!confirmPassword) return { label: "Re-enter your password to confirm.", matched: false, touched: false };
-  const matched = password === confirmPassword;
-  return {
-    label: matched ? "Passwords match." : "Passwords do not match.",
-    matched,
-    touched: true,
-  };
-}
+const fieldSx = {
+  "& .MuiOutlinedInput-root": {
+    backgroundColor: "#F8FAFC",
+    borderRadius: "16px",
+    "& fieldset": { borderColor: "transparent" },
+    "&:hover fieldset": { borderColor: "#E2E8F0" },
+    "&.Mui-focused fieldset": { borderColor: "#00A3FF" },
+  },
+  "& .MuiInputLabel-root": {
+    fontWeight: 500,
+    color: "#64748B",
+    "&.Mui-focused": { color: "#00A3FF" }
+  },
+  "& .MuiOutlinedInput-input": {
+    py: 1.8,
+    fontWeight: 500,
+  },
+};
 
 export default function SignupPage() {
   const { user, isLoading: authLoading } = useAuth();
@@ -105,13 +76,6 @@ export default function SignupPage() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
-  const selectedPlan = useMemo(
-    () => types.find((type) => type.id === selectedType) ?? null,
-    [selectedType, types],
-  );
-  const strength = passwordState(password);
-  const confirmState = confirmPasswordState(password, confirmPassword);
-
   useEffect(() => {
     api.get<CustomerTypeOption[]>("/api/auth/customer-types")
       .then(({ data }) => {
@@ -122,10 +86,15 @@ export default function SignupPage() {
       .finally(() => setTypesLoading(false));
   }, []);
 
+  const selectedPlan = useMemo(
+    () => types.find((type) => type.id === selectedType) ?? null,
+    [selectedType, types],
+  );
+
   if (authLoading) {
     return (
-      <div className="flex h-screen items-center justify-center bg-paper">
-        <CircularProgress />
+      <div className="flex h-screen items-center justify-center bg-white">
+        <CircularProgress size={32} thickness={5} className="text-pure-aqua" />
       </div>
     );
   }
@@ -187,345 +156,283 @@ export default function SignupPage() {
     }
   };
 
+  const containerVariants = {
+    hidden: { opacity: 0 },
+    visible: { opacity: 1, transition: { staggerChildren: 0.1 } }
+  };
+
+  const itemVariants = {
+    hidden: { y: 20, opacity: 0 },
+    visible: { y: 0, opacity: 1 }
+  };
+
   return (
-    <div className="flex min-h-screen">
-      <div className="hidden lg:flex lg:w-[45%] relative overflow-hidden flex-col justify-between p-12 text-white bg-gradient-to-br from-slate-900 via-sky-950 to-cyan-900">
-        <WavePattern />
-        <div className="absolute top-1/4 left-1/2 -translate-x-1/2 w-[500px] h-[500px] bg-cyan-500/10 rounded-full blur-[120px]" />
+    <div className="flex min-h-screen bg-white">
+      {/* Left Panel - Branding */}
+      <div className="hidden lg:flex lg:w-[40%] relative overflow-hidden flex-col justify-between p-12 text-white bg-slate-950">
+        <div className="absolute top-0 left-0 w-full h-full opacity-20 -z-0">
+           <div className="absolute top-[-10%] right-[-10%] w-[500px] h-[500px] bg-pure-aqua/30 blur-[120px] rounded-full" />
+           <div className="absolute bottom-[-10%] left-[-10%] w-[400px] h-[400px] bg-sky-500/20 blur-[100px] rounded-full" />
+        </div>
 
         <motion.div
-          initial={{ opacity: 0, y: -20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6 }}
+          initial={{ opacity: 0, x: -20 }}
+          animate={{ opacity: 1, x: 0 }}
           className="relative z-10"
         >
-          <div className="flex items-center gap-3 mb-16">
-            <div className="w-10 h-10 rounded-xl bg-white/10 flex items-center justify-center">
-              <Droplets className="w-6 h-6 text-aqua-400" />
+          <div className="flex items-center gap-3 mb-24">
+            <div className="w-11 h-11 rounded-2xl bg-pure-aqua flex items-center justify-center shadow-lg shadow-pure-aqua/20">
+              <Droplets className="w-6 h-6 text-white" />
             </div>
             <span className="text-xl font-semibold tracking-tight">SmartFlow</span>
           </div>
 
-          <h1 className="text-4xl font-bold leading-tight mb-4">
-            Join the
-            <br />
-            <span className="text-aqua-400">Conservation Movement</span>
+          <h1 className="text-5xl font-semibold leading-tight mb-6">
+            Smart water <br />
+            <span className="text-pure-aqua">management.</span>
           </h1>
-          <p className="text-slate-400 text-lg max-w-md">
-            Create your account and start managing your water consumption intelligently.
+          <p className="text-slate-400 text-lg max-w-sm leading-relaxed">
+            Create your account to start managing your daily water usage with precision and transparency.
           </p>
         </motion.div>
 
-        <div className="relative z-10" />
+        <div className="relative z-10 flex items-center gap-4 p-6 bg-white/5 border border-white/10 rounded-[32px] backdrop-blur-sm">
+           <div className="w-12 h-12 rounded-2xl bg-white/10 flex items-center justify-center shrink-0">
+              <ShieldCheck className="w-6 h-6 text-pure-aqua" />
+           </div>
+           <div>
+              <p className="text-sm font-semibold">Secure Onboarding</p>
+              <p className="text-xs text-slate-400">Encrypted data protection</p>
+           </div>
+        </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto bg-paper px-5 py-8 sm:px-8 lg:px-12">
-        <div className="mx-auto w-full max-w-2xl">
-          <div className="mb-8 flex items-center gap-3 lg:hidden">
-            <div className="w-9 h-9 rounded-lg bg-aqua-600 flex items-center justify-center">
+      {/* Right Panel - Form */}
+      <div className="flex-1 overflow-y-auto px-5 py-10 sm:px-12 lg:px-16">
+        <div className="mx-auto w-full max-w-xl">
+          {/* Mobile Header */}
+          <div className="mb-10 flex items-center gap-3 lg:hidden">
+            <div className="w-10 h-10 rounded-xl bg-pure-aqua flex items-center justify-center shadow-md shadow-pure-aqua/20">
               <Droplets className="w-5 h-5 text-white" />
             </div>
-            <span className="text-lg font-semibold text-ink-900">SmartFlow</span>
+            <span className="text-lg font-semibold text-slate-900">SmartFlow</span>
           </div>
 
-          <div className="mb-7">
-            <h2 className="text-3xl font-bold tracking-tight text-ink-900">Create your account</h2>
-            <p className="mt-2 text-sm leading-6 text-ink-700">
-              Start by selecting a water plan. The plan shows the rate charged
-              per litre and the maximum litres available per day.
-            </p>
-          </div>
+          <motion.div
+            initial="hidden"
+            animate="visible"
+            variants={containerVariants}
+            className="space-y-8"
+          >
+            <motion.div variants={itemVariants}>
+              <h2 className="text-3xl font-semibold tracking-tight text-slate-900 mb-2">Create Account</h2>
+              <p className="text-sm font-medium text-slate-500">Join the community of smart water users today.</p>
+            </motion.div>
 
-          {error && (
-            <Alert severity="error" className="mb-5" onClose={() => setError("")}>
-              {error}
-            </Alert>
-          )}
+            {error && (
+              <motion.div variants={itemVariants}>
+                <Alert severity="error" sx={{ borderRadius: '16px', fontWeight: 600 }}>{error}</Alert>
+              </motion.div>
+            )}
 
-          <form onSubmit={handleSubmit} className="space-y-5">
-            <section className="rounded-lg border border-ink-100 bg-white p-5 shadow-sm">
-              <div className="mb-4 flex items-start justify-between gap-4">
-                <div>
-                  <h3 className="text-base font-semibold text-ink-900">Water plan</h3>
-                  <p className="mt-1 text-sm text-ink-700">
-                    Select the plan that matches your expected daily water use.
-                  </p>
+            <form onSubmit={handleSubmit} className="space-y-8">
+              {/* Step 1: Select Plan */}
+              <motion.section variants={itemVariants} className="space-y-4">
+                <div className="flex items-center justify-between">
+                   <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-[0.2em] ml-1">1. Choose a Water Plan</p>
+                   {selectedPlan && (
+                      <div className="flex items-center gap-1.5 px-3 py-1 bg-pure-aqua/5 rounded-full">
+                         <Zap className="w-3 h-3 text-pure-aqua" />
+                         <span className="text-[10px] font-semibold text-pure-aqua uppercase tracking-wider">
+                           Rs. {formatNumber(selectedPlan.unit_price)}/L
+                         </span>
+                      </div>
+                   )}
                 </div>
-                {selectedPlan && (
-                  <div className="hidden rounded-lg bg-paper px-3 py-2 text-right sm:block">
-                    <div className="text-xs text-ink-700">Selected rate</div>
-                    <div className="text-sm font-bold text-ink-900">
-                      Rs. {formatNumber(selectedPlan.unit_price)} / litre
-                    </div>
-                  </div>
-                )}
-              </div>
 
-              {typesLoading ? (
-                <div className="grid gap-3 sm:grid-cols-2">
-                  <Skeleton variant="rounded" height={132} />
-                  <Skeleton variant="rounded" height={132} />
-                </div>
-              ) : types.length === 0 ? (
-                <div className="rounded-lg border border-ink-100 bg-paper px-4 py-5 text-sm text-ink-700">
-                  No water plans are available right now. Please contact support.
-                </div>
-              ) : (
-                <div className="grid gap-3 sm:grid-cols-2">
-                  {types.map((ct) => {
-                    const isSelected = selectedType === ct.id;
-                    return (
-                      <motion.button
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {typesLoading ? (
+                    [1, 2].map(i => <Skeleton key={i} variant="rounded" height={140} sx={{ borderRadius: '24px' }} />)
+                  ) : (
+                    types.map((ct) => (
+                      <button
                         key={ct.id}
                         type="button"
-                        whileTap={{ scale: 0.98 }}
                         onClick={() => setSelectedType(ct.id)}
-                        className={`relative rounded-lg border p-4 text-left transition ${
-                          isSelected
-                            ? "border-aqua-500 bg-aqua-50 shadow-sm"
-                            : "border-ink-100 bg-white hover:border-aqua-200 hover:bg-paper"
+                        className={`relative p-5 rounded-[28px] text-left transition-all border ${
+                          selectedType === ct.id
+                            ? "bg-white border-pure-aqua shadow-lg shadow-pure-aqua/5"
+                            : "bg-slate-50 border-slate-100 hover:bg-slate-100/50"
                         }`}
                       >
-                        <div className="mb-3 flex items-start justify-between gap-3">
-                          <div className="flex items-center gap-3">
-                            <div className={`flex h-10 w-10 items-center justify-center rounded-lg ${isSelected ? "bg-aqua-600" : "bg-paper"}`}>
-                              <Droplets className={`h-5 w-5 ${isSelected ? "text-white" : "text-aqua-600"}`} />
-                            </div>
-                            <div>
-                              <div className="text-sm font-bold capitalize text-ink-900">{ct.name}</div>
-                            </div>
-                          </div>
-                          {isSelected && (
-                            <span className="flex h-6 w-6 items-center justify-center rounded-full bg-aqua-600">
-                              <Check className="h-3.5 w-3.5 text-white" />
-                            </span>
-                          )}
+                        <div className="flex items-center justify-between mb-3">
+                           <div className={`w-9 h-9 rounded-xl flex items-center justify-center ${selectedType === ct.id ? 'bg-pure-aqua text-white' : 'bg-white text-slate-400'}`}>
+                              <Droplets className="w-5 h-5" />
+                           </div>
+                           {selectedType === ct.id && (
+                              <div className="w-5 h-5 rounded-full bg-pure-aqua flex items-center justify-center">
+                                 <Check className="w-3 h-3 text-white" />
+                              </div>
+                           )}
                         </div>
-
-                        <p className="mb-4 min-h-10 text-xs leading-5 text-ink-700">
-                          {ct.description || "Rate and daily allowance assigned by the SmartFlow team."}
+                        <p className="text-sm font-semibold text-slate-900 capitalize mb-1">{ct.name}</p>
+                        <p className="text-[10px] font-medium text-slate-400 leading-relaxed line-clamp-2">
+                           {ct.description || "Official SmartFlow water consumption plan."}
                         </p>
-
-                        <div className="grid grid-cols-2 gap-2">
-                          <div className="rounded-lg bg-paper px-3 py-2">
-                            <div className="text-[11px] font-medium text-ink-700">Rate</div>
-                            <div className="text-sm font-bold text-ink-900">
-                              Rs. {formatNumber(ct.unit_price)}/L
-                            </div>
-                          </div>
-                          <div className="rounded-lg bg-paper px-3 py-2">
-                            <div className="text-[11px] font-medium text-ink-700">Daily limit</div>
-                            <div className="text-sm font-bold text-ink-900">
-                              {formatNumber(ct.daily_litre_limit)} L
-                            </div>
-                          </div>
+                        <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between">
+                           <span className="text-[10px] font-semibold text-slate-400 uppercase">Limit</span>
+                           <span className="text-xs font-bold text-slate-900">{formatNumber(ct.daily_litre_limit)}L</span>
                         </div>
-                      </motion.button>
-                    );
-                  })}
+                      </button>
+                    ))
+                  )}
                 </div>
-              )}
-            </section>
+              </motion.section>
 
-            <section className="rounded-lg border border-ink-100 bg-white p-5 shadow-sm">
-              <div className="mb-4">
-                <h3 className="text-base font-semibold text-ink-900">Profile details</h3>
-                <p className="mt-1 text-sm text-ink-700">
-                  These details identify your customer profile at SmartFlow plants.
-                </p>
-              </div>
-
-              <div className="grid gap-4 sm:grid-cols-2">
-                <TextField
-                  fullWidth
-                  label="First name"
-                  value={firstName}
-                  onChange={(e) => setFirstName(e.target.value)}
-                  autoComplete="given-name"
-                  sx={fieldSx}
-                  slotProps={{
-                    input: {
-                      startAdornment: (
-                        <InputAdornment position="start">
-                          <User className="h-4 w-4 text-ink-300" />
-                        </InputAdornment>
-                      ),
-                    },
-                  }}
-                />
-                <TextField
-                  fullWidth
-                  label="Last name"
-                  value={lastName}
-                  onChange={(e) => setLastName(e.target.value)}
-                  autoComplete="family-name"
-                  sx={fieldSx}
-                  slotProps={{
-                    input: {
-                      startAdornment: (
-                        <InputAdornment position="start">
-                          <User className="h-4 w-4 text-ink-300" />
-                        </InputAdornment>
-                      ),
-                    },
-                  }}
-                />
-                <TextField
-                  fullWidth
-                  className="sm:col-span-2"
-                  label="Email address"
-                  placeholder="name@example.com"
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  autoComplete="email"
-                  sx={fieldSx}
-                  slotProps={{
-                    input: {
-                      startAdornment: (
-                        <InputAdornment position="start">
-                          <Mail className="h-4 w-4 text-ink-300" />
-                        </InputAdornment>
-                      ),
-                    },
-                  }}
-                />
-                <TextField
-                  fullWidth
-                  className="sm:col-span-2"
-                  label="Phone number"
-                  placeholder="Optional"
-                  value={phone}
-                  onChange={(e) => setPhone(e.target.value)}
-                  autoComplete="tel"
-                  sx={fieldSx}
-                  slotProps={{
-                    input: {
-                      startAdornment: (
-                        <InputAdornment position="start">
-                          <Phone className="h-4 w-4 text-ink-300" />
-                        </InputAdornment>
-                      ),
-                    },
-                  }}
-                />
-                <div className="sm:col-span-2">
+              {/* Step 2: Profile Info */}
+              <motion.section variants={itemVariants} className="space-y-5">
+                <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-[0.2em] ml-1">2. Profile Information</p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <TextField
                     fullWidth
-                    label="Password"
-                    type={showPassword ? "text" : "password"}
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    autoComplete="new-password"
+                    label="First Name"
+                    value={firstName}
+                    onChange={(e) => setFirstName(e.target.value)}
                     sx={fieldSx}
                     slotProps={{
                       input: {
                         startAdornment: (
                           <InputAdornment position="start">
-                            <Lock className="h-4 w-4 text-ink-300" />
+                            <User className="w-4 h-4 text-slate-400" />
+                          </InputAdornment>
+                        ),
+                      },
+                    }}
+                  />
+                  <TextField
+                    fullWidth
+                    label="Last Name"
+                    value={lastName}
+                    onChange={(e) => setLastName(e.target.value)}
+                    sx={fieldSx}
+                    slotProps={{
+                      input: {
+                        startAdornment: (
+                          <InputAdornment position="start">
+                            <User className="w-4 h-4 text-slate-400" />
+                          </InputAdornment>
+                        ),
+                      },
+                    }}
+                  />
+                  <TextField
+                    fullWidth
+                    className="sm:col-span-2"
+                    label="Email Address"
+                    type="email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    sx={fieldSx}
+                    slotProps={{
+                      input: {
+                        startAdornment: (
+                          <InputAdornment position="start">
+                            <Mail className="w-4 h-4 text-slate-400" />
+                          </InputAdornment>
+                        ),
+                      },
+                    }}
+                  />
+                  <TextField
+                    fullWidth
+                    className="sm:col-span-2"
+                    label="Phone Number (Optional)"
+                    value={phone}
+                    onChange={(e) => setPhone(e.target.value)}
+                    sx={fieldSx}
+                    slotProps={{
+                      input: {
+                        startAdornment: (
+                          <InputAdornment position="start">
+                            <Phone className="w-4 h-4 text-slate-400" />
+                          </InputAdornment>
+                        ),
+                      },
+                    }}
+                  />
+                </div>
+              </motion.section>
+
+              {/* Step 3: Security */}
+              <motion.section variants={itemVariants} className="space-y-5">
+                <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-[0.2em] ml-1">3. Account Security</p>
+                <div className="grid grid-cols-1 gap-4">
+                  <TextField
+                    fullWidth
+                    label="Create Password"
+                    type={showPassword ? "text" : "password"}
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    sx={fieldSx}
+                    slotProps={{
+                      input: {
+                        startAdornment: (
+                          <InputAdornment position="start">
+                            <Lock className="w-4 h-4 text-slate-400" />
                           </InputAdornment>
                         ),
                         endAdornment: (
                           <InputAdornment position="end">
                             <IconButton size="small" onClick={() => setShowPassword(!showPassword)} edge="end">
-                              {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                              {showPassword ? <EyeOff className="w-4 h-4 text-slate-400" /> : <Eye className="w-4 h-4 text-slate-400" />}
                             </IconButton>
                           </InputAdornment>
                         ),
                       },
                     }}
                   />
-                  <div className="mt-2">
-                    <div className="h-1.5 overflow-hidden rounded-full bg-ink-100">
-                      <div className={`h-full rounded-full ${strength.color} ${strength.width}`} />
-                    </div>
-                    <p className="mt-1 text-xs text-ink-700">{strength.label}</p>
-                  </div>
-                </div>
-                <div className="sm:col-span-2">
                   <TextField
                     fullWidth
-                    label="Confirm password"
+                    label="Confirm Password"
                     type={showPassword ? "text" : "password"}
                     value={confirmPassword}
                     onChange={(e) => setConfirmPassword(e.target.value)}
-                    autoComplete="new-password"
-                    sx={{
-                      ...fieldSx,
-                      "& .MuiOutlinedInput-root fieldset": {
-                        borderColor: confirmState.touched
-                          ? confirmState.matched
-                            ? "#5EC5D9"
-                            : "#F2B8AE"
-                          : undefined,
-                      },
-                    }}
+                    sx={fieldSx}
                     slotProps={{
                       input: {
                         startAdornment: (
                           <InputAdornment position="start">
-                            <Lock className="h-4 w-4 text-ink-300" />
+                            <Lock className="w-4 h-4 text-slate-400" />
                           </InputAdornment>
                         ),
                       },
                     }}
                   />
-                  {password && (
-                    <div className="mt-2">
-                      <div className="flex flex-wrap gap-1">
-                        {Array.from(password).map((char, index) => {
-                          const hasConfirmChar = confirmPassword.length > index;
-                          const matches = confirmPassword[index] === char;
-                          const color = !hasConfirmChar
-                            ? "bg-ink-100 text-transparent"
-                            : matches
-                              ? "bg-aqua-100 text-aqua-700"
-                              : "bg-red-50 text-red-500";
-                          return (
-                            <span
-                              key={`${char}-${index}`}
-                              className={`flex h-5 min-w-5 items-center justify-center rounded px-1 text-[10px] font-bold ${color}`}
-                            >
-                              {showPassword ? char : "•"}
-                            </span>
-                          );
-                        })}
-                      </div>
-                      <p className={`mt-1 text-xs ${confirmState.touched && !confirmState.matched ? "text-red-500" : "text-ink-700"}`}>
-                        {confirmState.label}
-                      </p>
-                    </div>
-                  )}
                 </div>
-              </div>
-            </section>
+              </motion.section>
 
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-              <p className="text-sm text-ink-700">
-                Already registered?{" "}
-                <Link to="/login" className="font-semibold text-aqua-700 hover:underline">
-                  Sign in
-                </Link>
-              </p>
-              <Button
-                type="submit"
-                variant="contained"
-                size="large"
-                disabled={loading || !selectedType || typesLoading || password !== confirmPassword}
-                endIcon={!loading ? <ArrowRight className="h-4 w-4" /> : undefined}
-                sx={{
-                  px: 3,
-                  py: 1.45,
-                  borderRadius: "8px",
-                  textTransform: "none",
-                  fontWeight: 700,
-                  fontSize: "1rem",
-                }}
-              >
-                {loading ? <CircularProgress size={22} color="inherit" /> : "Create account"}
-              </Button>
-            </div>
-          </form>
+              <motion.div variants={itemVariants} className="pt-4 space-y-4">
+                <button
+                  type="submit"
+                  disabled={loading || !selectedType || password !== confirmPassword}
+                  className="w-full py-4.5 bg-pure-aqua text-white rounded-[24px] font-semibold text-sm uppercase tracking-widest shadow-xl shadow-pure-aqua/20 flex items-center justify-center gap-2 active:scale-[0.98] transition-all disabled:opacity-50"
+                >
+                  {loading ? (
+                    <CircularProgress size={20} color="inherit" />
+                  ) : (
+                    <span className="flex items-center gap-2">Create Account <ChevronRight className="w-4.5 h-4.5" /></span>
+                  )}
+                </button>
+
+                <p className="text-center text-sm font-medium text-slate-500">
+                  Already have an account?{" "}
+                  <Link to="/login" className="text-pure-aqua font-semibold hover:underline decoration-2 underline-offset-4">
+                    Sign In
+                  </Link>
+                </p>
+              </motion.div>
+            </form>
+          </motion.div>
         </div>
       </div>
     </div>
