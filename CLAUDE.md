@@ -154,6 +154,12 @@ src/
 
 ---
 
+### Git rules
+
+- Never add co-author name in commit msg
+
+---
+
 ## Docs
 
 - `docs/versions/V1.1_MULTIPLE_TAP_DISPENSE.md` — current feature spec + edge-case table (14 rows)
