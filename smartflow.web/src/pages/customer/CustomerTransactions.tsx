@@ -1,29 +1,24 @@
 import { useEffect, useState } from "react";
 import {
-  Button,
-  Chip,
   CircularProgress,
   Dialog,
-  DialogActions,
   DialogContent,
   DialogTitle,
   IconButton,
-  Paper,
-  Tab,
-  Tabs,
   TextField,
-  Typography,
 } from "@mui/material";
 import {
-  ArrowUpRight,
-  ArrowDownRight,
   Droplets,
   Filter,
   History,
   ChevronDown,
   ChevronUp,
+  X,
+  Calendar,
 } from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
 import MobilePageHeader from "../../components/MobilePageHeader";
+import CustomerTransactionRow from "../../components/CustomerTransactionRow";
 import {
   getCustomerTransactions,
   getCustomerPurchases,
@@ -31,7 +26,7 @@ import {
   type CustomerPurchase,
   type CustomerCaneDetail,
 } from "../../lib/customerApi";
-import { type Period, periodDates } from "../../lib/time";
+import { type Period, periodDates, formatTimestamp } from "../../lib/time";
 
 const CANE_STATUS_MAP: Record<string, { label: string; color: string; bg: string }> = {
   completed:         { label: "Completed",   color: "#059669", bg: "#ecfdf5" },
@@ -52,23 +47,19 @@ const GROUP_STATUS_MAP: Record<string, { label: string; color: string; bg: strin
 function caneChip(status: string) {
   const s = CANE_STATUS_MAP[status] ?? { label: status, color: "#64748b", bg: "#f1f5f9" };
   return (
-    <Chip label={s.label} size="small" sx={{ fontWeight: 500, fontSize: "0.65rem", height: 20, color: s.color, bgcolor: s.bg }} />
+    <div className={`px-2 py-0.5 rounded-md text-[9px] font-bold uppercase tracking-tighter`} style={{ color: s.color, backgroundColor: s.bg }}>
+      {s.label}
+    </div>
   );
 }
 
 function groupChip(status: string) {
   const s = GROUP_STATUS_MAP[status] ?? { label: status, color: "#64748b", bg: "#f1f5f9" };
   return (
-    <Chip label={s.label} size="small" sx={{ fontWeight: 500, fontSize: "0.7rem", height: 22, color: s.color, bgcolor: s.bg }} />
+    <div className={`px-2 py-1 rounded-lg text-[10px] font-bold uppercase tracking-wider`} style={{ color: s.color, backgroundColor: s.bg }}>
+      {s.label}
+    </div>
   );
-}
-
-function fmtTime(iso: string) {
-  return new Date(iso).toLocaleString("en-PK", {
-    dateStyle: "medium",
-    timeStyle: "short",
-    hour12: true,
-  });
 }
 
 function groupByTap(canes: CustomerCaneDetail[]) {
@@ -83,16 +74,16 @@ function groupByTap(canes: CustomerCaneDetail[]) {
 
 function CaneRow({ cane }: { cane: CustomerCaneDetail }) {
   return (
-    <div className="flex items-center justify-between py-1.5 text-xs border-t border-slate-100">
+    <div className="flex items-center justify-between py-2 text-[11px] border-t border-slate-50">
       <div className="flex items-center gap-2 min-w-0">
-        <span className="text-slate-500 shrink-0">#{cane.cane_number}</span>
+        <span className="text-slate-400 font-medium shrink-0">#{cane.cane_number}</span>
         {caneChip(cane.status)}
       </div>
       <div className="flex items-center gap-3 text-right shrink-0">
-        <span className="text-slate-600">
-          {cane.litres_delivered.toFixed(2)} of {cane.litres_requested.toFixed(2)} L
+        <span className="text-slate-500 font-medium">
+          {cane.litres_delivered.toFixed(2)}/{cane.litres_requested.toFixed(2)} L
         </span>
-        <span className="text-slate-800 font-medium w-16 text-right">
+        <span className="text-slate-900 font-semibold w-14 text-right">
           Rs. {cane.price.toFixed(2)}
         </span>
       </div>
@@ -104,35 +95,31 @@ function PurchaseCard({ p }: { p: CustomerPurchase }) {
   const [open, setOpen] = useState(false);
   const byTap = groupByTap(p.canes);
   return (
-    <Paper
-      elevation={0}
-      sx={{ borderRadius: 2, overflow: "hidden" }}
-      className="border border-slate-100"
-    >
+    <div className="bg-white border border-slate-100 rounded-[24px] overflow-hidden shadow-sm transition-all">
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        className="w-full text-left px-3 py-2.5 flex items-center justify-between hover:bg-slate-50/60 transition-colors"
+        className="w-full text-left p-4 flex items-center justify-between active:bg-slate-50 transition-colors"
       >
         <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-2 mb-1">
-            <Typography variant="body2" sx={{ fontWeight: 600 }}>
+          <div className="flex items-center gap-2 mb-1.5">
+            <h3 className="text-sm font-semibold text-slate-900 truncate">
               {p.plant_name}
-            </Typography>
+            </h3>
             {groupChip(p.status)}
           </div>
-          <div className="flex items-center gap-3 text-xs text-slate-500">
+          <div className="flex items-center gap-3 text-[11px] text-slate-400 font-medium">
             <span className="flex items-center gap-1">
-              <Droplets className="w-3 h-3" />
+              <Droplets className="w-3 h-3 text-pure-aqua" />
               {p.total_litres.toFixed(2)} L
             </span>
-            <span>{p.cane_count} cane{p.cane_count > 1 ? "s" : ""}</span>
-            <span className="font-medium text-slate-700">Rs. {p.total_price.toFixed(2)}</span>
+            <span>{p.cane_count} Canes</span>
+            <span className="text-slate-900 font-semibold">Rs. {p.total_price.toFixed(2)}</span>
           </div>
         </div>
-        <div className="flex flex-col items-end gap-1 shrink-0 ml-3">
-          <span className="text-[11px] text-slate-400">
-            {fmtTime(p.created_at)}
+        <div className="flex flex-col items-end gap-1.5 shrink-0 ml-3">
+          <span className="text-[10px] font-medium text-slate-400">
+            {formatTimestamp(p.created_at)}
           </span>
           {open ? (
             <ChevronUp className="w-4 h-4 text-slate-400" />
@@ -141,21 +128,31 @@ function PurchaseCard({ p }: { p: CustomerPurchase }) {
           )}
         </div>
       </button>
-      {open && (
-        <div className="px-3 pb-2.5 pt-0 space-y-2">
-          {[...byTap.entries()].map(([tapLabel, canes]) => (
-            <div key={tapLabel}>
-              <Typography variant="caption" sx={{ fontWeight: 600, color: "text.secondary" }}>
-                {tapLabel}
-              </Typography>
-              {canes.map((c) => (
-                <CaneRow key={c.id} cane={c} />
-              ))}
-            </div>
-          ))}
-        </div>
-      )}
-    </Paper>
+      <AnimatePresence>
+        {open && (
+          <motion.div
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: "auto", opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            className="px-4 pb-4 pt-0 space-y-3 overflow-hidden"
+          >
+            {[...byTap.entries()].map(([tapLabel, canes]) => (
+              <div key={tapLabel} className="bg-slate-50/50 rounded-xl p-3">
+                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2 flex items-center gap-1.5">
+                   <div className="w-1.5 h-1.5 rounded-full bg-pure-aqua" />
+                   {tapLabel}
+                </p>
+                <div className="space-y-1">
+                  {canes.map((c) => (
+                    <CaneRow key={c.id} cane={c} />
+                  ))}
+                </div>
+              </div>
+            ))}
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
   );
 }
 
@@ -201,134 +198,175 @@ export default function CustomerTransactions() {
     setFilterOpen(false);
   };
 
+  const containerVariants = {
+    hidden: { opacity: 0 },
+    visible: {
+      opacity: 1,
+      transition: { staggerChildren: 0.05 },
+    },
+  };
+
+  const itemVariants = {
+    hidden: { y: 15, opacity: 0 },
+    visible: { y: 0, opacity: 1 },
+  };
+
   return (
-    <div className="px-4 pt-6">
-      <MobilePageHeader
-        icon={History}
-        title="History"
-        subtitle="Wallet and dispense activity"
-      />
+    <motion.div
+      initial="hidden"
+      animate="visible"
+      variants={containerVariants}
+      className="relative min-h-screen pb-12 overflow-x-hidden"
+    >
+      <div className="absolute top-0 left-0 right-0 h-48 bg-gradient-to-b from-slate-50 to-transparent -z-10" />
 
-      <div className="mb-3 flex items-center justify-between gap-3">
-        <Tabs
-          value={tab}
-          onChange={(_, v) => setTab(v)}
-          sx={{ minHeight: 36 }}
-        >
-          <Tab label="Wallet" sx={{ textTransform: "none", minHeight: 36, py: 0 }} />
-          <Tab label="Dispenses" sx={{ textTransform: "none", minHeight: 36, py: 0 }} />
-        </Tabs>
-        <IconButton size="small" onClick={() => setFilterOpen(true)} sx={{ border: "1px solid #E2E8F0", bgcolor: period === "custom" ? "#ECFDF5" : "white" }}>
-          <Filter className={`w-4 h-4 ${period === "custom" ? "text-emerald-600" : "text-slate-500"}`} />
-        </IconButton>
-      </div>
+      <div className="px-5 pt-8">
+        <motion.div variants={itemVariants}>
+          <MobilePageHeader
+            icon={History}
+            title="History"
+            subtitle="Your activity and records"
+          />
+        </motion.div>
 
-      <div className="flex gap-1.5 mb-3">
-        {PERIODS.map((p) => (
-          <Chip
-            key={p.key}
-            label={p.label}
-            size="small"
-            variant={period === p.key ? "filled" : "outlined"}
-            color={period === p.key ? "primary" : "default"}
-            onClick={() => selectPeriod(p.key)}
-            sx={{ fontWeight: 500 }}
-          />
-        ))}
-        {period === "custom" && (
-          <Chip
-            label={`${dateFrom || "…"} – ${dateTo || "…"}`}
-            size="small"
-            variant="filled"
-            color="primary"
-            onDelete={() => selectPeriod("today")}
-            sx={{ fontWeight: 500 }}
-          />
+        {/* Filters & Tabs */}
+        <motion.div variants={itemVariants} className="mb-6">
+           <div className="flex items-center justify-between mb-4">
+              <div className="flex gap-1.5">
+                {PERIODS.map((p) => (
+                  <button
+                    key={p.key}
+                    onClick={() => selectPeriod(p.key)}
+                    className={`px-4 py-2 rounded-xl text-xs font-semibold transition-all ${
+                      period === p.key
+                        ? "bg-pure-aqua text-white shadow-md shadow-pure-aqua/20"
+                        : "bg-white border border-slate-100 text-slate-500 hover:bg-slate-50"
+                    }`}
+                  >
+                    {p.label}
+                  </button>
+                ))}
+              </div>
+              <IconButton
+                onClick={() => setFilterOpen(true)}
+                sx={{
+                  borderRadius: '12px',
+                  bgcolor: period === "custom" ? '#00A3FF' : 'white',
+                  color: period === "custom" ? 'white' : '#64748b',
+                  border: '1px solid #F1F5F9',
+                  '&:hover': { bgcolor: period === "custom" ? '#008BD9' : '#F8FAFC' }
+                }}
+              >
+                <Filter className="w-4.5 h-4.5" />
+              </IconButton>
+           </div>
+
+           <div className="bg-slate-100/50 p-1 rounded-2xl flex gap-1">
+              <button
+                onClick={() => setTab(0)}
+                className={`flex-1 py-2.5 rounded-xl text-xs font-semibold transition-all ${tab === 0 ? "bg-white text-pure-aqua shadow-sm" : "text-slate-500"}`}
+              >
+                Wallet
+              </button>
+              <button
+                onClick={() => setTab(1)}
+                className={`flex-1 py-2.5 rounded-xl text-xs font-semibold transition-all ${tab === 1 ? "bg-white text-pure-aqua shadow-sm" : "text-slate-500"}`}
+              >
+                Dispenses
+              </button>
+           </div>
+        </motion.div>
+
+        {loading ? (
+          <div className="flex items-center justify-center py-20">
+            <CircularProgress sx={{ color: "#00A3FF" }} />
+          </div>
+        ) : (
+          <motion.div variants={itemVariants} className="space-y-3">
+            {tab === 0 ? (
+              txs.length === 0 ? (
+                <div className="py-20 text-center">
+                   <p className="text-slate-400 font-medium text-sm">No wallet transactions found</p>
+                </div>
+              ) : (
+                txs.map((tx) => (
+                  <CustomerTransactionRow
+                    key={tx.id}
+                    tx={tx}
+                    currency="Rs."
+                    className="border border-slate-100 rounded-[24px] shadow-sm"
+                  />
+                ))
+              )
+            ) : (
+              purchases.length === 0 ? (
+                <div className="py-20 text-center">
+                   <p className="text-slate-400 font-medium text-sm">No dispense activity found</p>
+                </div>
+              ) : (
+                purchases.map((p) => <PurchaseCard key={p.id} p={p} />)
+              )
+            )}
+          </motion.div>
         )}
       </div>
 
-      {loading ? (
-        <div className="flex items-center justify-center h-64">
-          <CircularProgress />
-        </div>
-      ) : (
-        <>
-          {tab === 0 && (
-            <div className="space-y-2">
-              {txs.length === 0 ? (
-                <p className="text-center text-slate-400 py-10">
-                  No wallet transactions
-                </p>
-              ) : (
-                txs.map((tx) => (
-                  <Paper
-                    key={tx.id}
-                    elevation={0}
-                    sx={{ px: 2.5, py: 2, borderRadius: 2 }}
-                    className="flex items-center justify-between border border-slate-100"
-                  >
-                    <div className="flex items-center gap-3">
-                      <div
-                        className={`w-9 h-9 rounded-full flex items-center justify-center ${
-                          tx.type === "credit" ? "bg-emerald-50" : "bg-red-50"
-                        }`}
-                      >
-                        {tx.type === "credit" ? (
-                          <ArrowDownRight className="w-4 h-4 text-emerald-500" />
-                        ) : (
-                          <ArrowUpRight className="w-4 h-4 text-red-500" />
-                        )}
-                      </div>
-                      <div>
-                        <p className="text-sm font-medium text-ink-900">
-                          {tx.type === "credit" ? "Credit" : "Debit"}
-                          {tx.purchase_id ? ` #${tx.purchase_id}` : ""}
-                        </p>
-                        <p className="text-xs text-slate-400">
-                          {fmtTime(tx.timestamp)}
-                        </p>
-                      </div>
-                    </div>
-                    <Chip
-                      label={`${tx.type === "credit" ? "+" : "-"} Rs. ${tx.amount.toFixed(2)}`}
-                      size="small"
-                      sx={{
-                        fontWeight: 600,
-                        bgcolor: tx.type === "credit" ? "#ecfdf5" : "#fef2f2",
-                        color: tx.type === "credit" ? "#059669" : "#dc2626",
-                      }}
-                    />
-                  </Paper>
-                ))
-              )}
+      <Dialog
+        open={filterOpen}
+        onClose={() => setFilterOpen(false)}
+        fullWidth
+        maxWidth="xs"
+        slotProps={{
+          paper: { sx: { borderRadius: '24px', p: 0.5 } }
+        }}
+      >        <DialogTitle sx={{ p: 3, pb: 2 }}>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+               <div className="w-10 h-10 rounded-xl bg-pure-aqua/10 flex items-center justify-center text-pure-aqua">
+                  <Calendar className="w-5 h-5" />
+               </div>
+               <h2 className="text-lg font-semibold text-slate-900">Custom Range</h2>
             </div>
-          )}
-
-          {tab === 1 && (
-            <div className="space-y-2">
-              {purchases.length === 0 ? (
-                <p className="text-center text-slate-400 py-10">
-                  No dispense activity yet
-                </p>
-              ) : (
-                purchases.map((p) => <PurchaseCard key={p.id} p={p} />)
-              )}
-            </div>
-          )}
-        </>
-      )}
-
-      <Dialog open={filterOpen} onClose={() => setFilterOpen(false)} fullWidth maxWidth="xs">
-        <DialogTitle sx={{ fontWeight: 700 }}>Custom Date Range</DialogTitle>
-        <DialogContent className="space-y-3! pt-2!">
-          <TextField label="From" type="date" size="small" fullWidth value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} slotProps={{ inputLabel: { shrink: true } }} />
-          <TextField label="To" type="date" size="small" fullWidth value={dateTo} onChange={(e) => setDateTo(e.target.value)} slotProps={{ inputLabel: { shrink: true } }} />
+            <IconButton onClick={() => setFilterOpen(false)} sx={{ bgcolor: '#F8FAFC' }}>
+              <X className="w-4 h-4 text-slate-400" />
+            </IconButton>
+          </div>
+        </DialogTitle>
+        <DialogContent sx={{ p: 3, pt: 1 }}>
+          <div className="space-y-4 mt-4">
+            <TextField
+              label="Starting From"
+              type="date"
+              fullWidth
+              value={dateFrom}
+              onChange={(e) => setDateFrom(e.target.value)}
+              slotProps={{ inputLabel: { shrink: true }, input: { sx: { borderRadius: '16px' } } }}
+            />
+            <TextField
+              label="Ending At"
+              type="date"
+              fullWidth
+              value={dateTo}
+              onChange={(e) => setDateTo(e.target.value)}
+              slotProps={{ inputLabel: { shrink: true }, input: { sx: { borderRadius: '16px' } } }}
+            />
+          </div>
+          <div className="grid grid-cols-2 gap-3 mt-8">
+             <button
+                onClick={() => { setDateFrom(""); setDateTo(""); selectPeriod("today"); setFilterOpen(false); }}
+                className="py-3.5 rounded-2xl bg-slate-100 text-slate-600 text-sm font-semibold active:scale-[0.98] transition-all"
+             >
+               Reset
+             </button>
+             <button
+                onClick={applyCustom}
+                className="py-3.5 rounded-2xl bg-pure-aqua text-white text-sm font-semibold shadow-lg shadow-pure-aqua/20 active:scale-[0.98] transition-all"
+             >
+               Apply Filter
+             </button>
+          </div>
         </DialogContent>
-        <DialogActions sx={{ px: 3, pb: 2 }}>
-          <Button onClick={() => { setDateFrom(""); setDateTo(""); selectPeriod("today"); setFilterOpen(false); }} sx={{ textTransform: "none" }}>Clear</Button>
-          <Button variant="contained" onClick={applyCustom} sx={{ textTransform: "none" }}>Apply</Button>
-        </DialogActions>
       </Dialog>
-    </div>
+    </motion.div>
   );
 }

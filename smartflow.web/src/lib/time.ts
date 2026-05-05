@@ -8,6 +8,14 @@ export function formatTime12h(value: string): string {
   return `${displayHour}:${minute} ${period}`;
 }
 
+export function formatTimestamp(iso: string): string {
+  return new Date(iso).toLocaleString("en-PK", {
+    dateStyle: "medium",
+    timeStyle: "short",
+    hour12: true,
+  });
+}
+
 export type Period = "today" | "7d" | "30d" | "custom";
 
 function toISO(d: Date): string {
