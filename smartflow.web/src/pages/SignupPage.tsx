@@ -58,6 +58,79 @@ const fieldSx = {
   },
 };
 
+function WavePattern() {
+  return (
+    <div className="absolute inset-0 overflow-hidden opacity-[0.07]">
+      <svg
+        className="absolute w-[200%] h-full"
+        viewBox="0 0 1440 800"
+        preserveAspectRatio="none"
+      >
+        <motion.path
+          d="M0,400 C360,300 720,500 1080,350 C1260,300 1350,400 1440,380 L1440,800 L0,800 Z"
+          fill="currentColor"
+          className="text-white"
+          animate={{
+            d: [
+              "M0,400 C360,300 720,500 1080,350 C1260,300 1350,400 1440,380 L1440,800 L0,800 Z",
+              "M0,350 C360,450 720,300 1080,400 C1260,450 1350,350 1440,370 L1440,800 L0,800 Z",
+              "M0,400 C360,300 720,500 1080,350 C1260,300 1350,400 1440,380 L1440,800 L0,800 Z",
+            ],
+          }}
+          transition={{ duration: 8, repeat: Infinity, ease: "easeInOut" }}
+        />
+        <motion.path
+          d="M0,500 C360,400 720,600 1080,450 C1260,400 1350,500 1440,480 L1440,800 L0,800 Z"
+          fill="currentColor"
+          className="text-white"
+          animate={{
+            d: [
+              "M0,500 C360,400 720,600 1080,450 C1260,400 1350,500 1440,480 L1440,800 L0,800 Z",
+              "M0,450 C360,550 720,400 1080,500 C1260,550 1350,450 1440,470 L1440,800 L0,800 Z",
+              "M0,500 C360,400 720,600 1080,450 C1260,400 1350,500 1440,480 L1440,800 L0,800 Z",
+            ],
+          }}
+          transition={{ duration: 10, repeat: Infinity, ease: "easeInOut" }}
+        />
+      </svg>
+    </div>
+  );
+}
+
+function FloatingDroplets() {
+  const droplets = [
+    { size: 6, x: "15%", delay: 0, duration: 7 },
+    { size: 4, x: "30%", delay: 1.5, duration: 9 },
+    { size: 8, x: "50%", delay: 0.5, duration: 8 },
+    { size: 5, x: "70%", delay: 2, duration: 10 },
+    { size: 3, x: "85%", delay: 1, duration: 7.5 },
+    { size: 7, x: "40%", delay: 3, duration: 9.5 },
+  ];
+
+  return (
+    <div className="absolute inset-0 overflow-hidden">
+      {droplets.map((d, i) => (
+        <motion.div
+          key={i}
+          className="absolute rounded-full bg-white/10"
+          style={{ width: d.size, height: d.size, left: d.x }}
+          initial={{ y: "110%", opacity: 0 }}
+          animate={{
+            y: ["110%", "-10%"],
+            opacity: [0, 0.6, 0.6, 0],
+          }}
+          transition={{
+            duration: d.duration,
+            repeat: Infinity,
+            delay: d.delay,
+            ease: "linear",
+          }}
+        />
+      ))}
+    </div>
+  );
+}
+
 export default function SignupPage() {
   const { user, isLoading: authLoading } = useAuth();
   const navigate = useNavigate();
@@ -94,7 +167,7 @@ export default function SignupPage() {
   if (authLoading) {
     return (
       <div className="flex h-screen items-center justify-center bg-white">
-        <CircularProgress size={32} thickness={5} className="text-pure-aqua" />
+        <CircularProgress size={32} thickness={5} sx={{ color: "#00A3FF" }} />
       </div>
     );
   }
@@ -169,11 +242,11 @@ export default function SignupPage() {
   return (
     <div className="flex min-h-screen bg-white">
       {/* Left Panel - Branding */}
-      <div className="hidden lg:flex lg:w-[40%] relative overflow-hidden flex-col justify-between p-12 text-white bg-slate-950">
-        <div className="absolute top-0 left-0 w-full h-full opacity-20 -z-0">
-           <div className="absolute top-[-10%] right-[-10%] w-[500px] h-[500px] bg-pure-aqua/30 blur-[120px] rounded-full" />
-           <div className="absolute bottom-[-10%] left-[-10%] w-[400px] h-[400px] bg-sky-500/20 blur-[100px] rounded-full" />
-        </div>
+      <div className="hidden lg:flex lg:w-[45%] relative overflow-hidden flex-col justify-between p-12 text-white bg-gradient-to-br from-slate-900 via-sky-950 to-cyan-900">
+        <WavePattern />
+        <FloatingDroplets />
+
+        <div className="absolute top-1/4 left-1/2 -translate-x-1/2 w-[500px] h-[500px] bg-cyan-500/10 rounded-full blur-[120px]" />
 
         <motion.div
           initial={{ opacity: 0, x: -20 }}
@@ -208,10 +281,10 @@ export default function SignupPage() {
       </div>
 
       {/* Right Panel - Form */}
-      <div className="flex-1 overflow-y-auto px-5 py-10 sm:px-12 lg:px-16">
+      <div className="flex-1 min-h-screen overflow-y-auto lg:flex lg:flex-col lg:justify-center px-5 py-6 sm:px-12 lg:px-16">
         <div className="mx-auto w-full max-w-xl">
           {/* Mobile Header */}
-          <div className="mb-10 flex items-center gap-3 lg:hidden">
+          <div className="mb-8 flex items-center gap-3 lg:hidden">
             <div className="w-10 h-10 rounded-xl bg-pure-aqua flex items-center justify-center shadow-md shadow-pure-aqua/20">
               <Droplets className="w-5 h-5 text-white" />
             </div>
@@ -222,10 +295,10 @@ export default function SignupPage() {
             initial="hidden"
             animate="visible"
             variants={containerVariants}
-            className="space-y-8"
+            className="space-y-5 lg:space-y-6"
           >
             <motion.div variants={itemVariants}>
-              <h2 className="text-3xl font-semibold tracking-tight text-slate-900 mb-2">Create Account</h2>
+              <h2 className="text-3xl font-semibold tracking-tight text-slate-900 mb-1">Create Account</h2>
               <p className="text-sm font-medium text-slate-500">Join the community of smart water users today.</p>
             </motion.div>
 
@@ -235,9 +308,9 @@ export default function SignupPage() {
               </motion.div>
             )}
 
-            <form onSubmit={handleSubmit} className="space-y-8">
+            <form onSubmit={handleSubmit} className="space-y-5 lg:space-y-6">
               {/* Step 1: Select Plan */}
-              <motion.section variants={itemVariants} className="space-y-4">
+              <motion.section variants={itemVariants} className="space-y-3">
                 <div className="flex items-center justify-between">
                    <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-[0.2em] ml-1">1. Choose a Water Plan</p>
                    {selectedPlan && (
@@ -252,36 +325,36 @@ export default function SignupPage() {
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   {typesLoading ? (
-                    [1, 2].map(i => <Skeleton key={i} variant="rounded" height={140} sx={{ borderRadius: '24px' }} />)
+                    [1, 2].map(i => <Skeleton key={i} variant="rounded" height={120} sx={{ borderRadius: '24px' }} />)
                   ) : (
                     types.map((ct) => (
                       <button
                         key={ct.id}
                         type="button"
                         onClick={() => setSelectedType(ct.id)}
-                        className={`relative p-5 rounded-[28px] text-left transition-all border ${
+                        className={`relative p-3.5 rounded-[24px] text-left transition-all border ${
                           selectedType === ct.id
                             ? "bg-white border-pure-aqua shadow-lg shadow-pure-aqua/5"
                             : "bg-slate-50 border-slate-100 hover:bg-slate-100/50"
                         }`}
                       >
-                        <div className="flex items-center justify-between mb-3">
-                           <div className={`w-9 h-9 rounded-xl flex items-center justify-center ${selectedType === ct.id ? 'bg-pure-aqua text-white' : 'bg-white text-slate-400'}`}>
-                              <Droplets className="w-5 h-5" />
+                        <div className="flex items-center justify-between mb-2">
+                           <div className={`w-7 h-7 rounded-lg flex items-center justify-center ${selectedType === ct.id ? 'bg-pure-aqua text-white' : 'bg-white text-slate-400'}`}>
+                              <Droplets className="w-4 h-4" />
                            </div>
                            {selectedType === ct.id && (
-                              <div className="w-5 h-5 rounded-full bg-pure-aqua flex items-center justify-center">
-                                 <Check className="w-3 h-3 text-white" />
+                              <div className="w-4.5 h-4.5 rounded-full bg-pure-aqua flex items-center justify-center">
+                                 <Check className="w-2.5 h-2.5 text-white" />
                               </div>
                            )}
                         </div>
-                        <p className="text-sm font-semibold text-slate-900 capitalize mb-1">{ct.name}</p>
-                        <p className="text-[10px] font-medium text-slate-400 leading-relaxed line-clamp-2">
-                           {ct.description || "Official SmartFlow water consumption plan."}
+                        <p className="text-[13px] font-semibold text-slate-900 capitalize mb-0.5">{ct.name}</p>
+                        <p className="text-[10px] font-medium text-slate-400 leading-relaxed line-clamp-1">
+                           {ct.description || "SmartFlow water consumption plan."}
                         </p>
-                        <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between">
-                           <span className="text-[10px] font-semibold text-slate-400 uppercase">Limit</span>
-                           <span className="text-xs font-bold text-slate-900">{formatNumber(ct.daily_litre_limit)}L</span>
+                        <div className="mt-2.5 pt-2 border-t border-slate-100 flex items-center justify-between">
+                           <span className="text-[9px] font-semibold text-slate-400 uppercase">Limit</span>
+                           <span className="text-[11px] font-bold text-slate-900">{formatNumber(ct.daily_litre_limit)}L</span>
                         </div>
                       </button>
                     ))
@@ -290,9 +363,9 @@ export default function SignupPage() {
               </motion.section>
 
               {/* Step 2: Profile Info */}
-              <motion.section variants={itemVariants} className="space-y-5">
+              <motion.section variants={itemVariants} className="space-y-3.5">
                 <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-[0.2em] ml-1">2. Profile Information</p>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <TextField
                     fullWidth
                     label="First Name"
@@ -364,9 +437,9 @@ export default function SignupPage() {
               </motion.section>
 
               {/* Step 3: Security */}
-              <motion.section variants={itemVariants} className="space-y-5">
+              <motion.section variants={itemVariants} className="space-y-3.5">
                 <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-[0.2em] ml-1">3. Account Security</p>
-                <div className="grid grid-cols-1 gap-4">
+                <div className="grid grid-cols-1 gap-3">
                   <TextField
                     fullWidth
                     label="Create Password"
@@ -411,11 +484,11 @@ export default function SignupPage() {
                 </div>
               </motion.section>
 
-              <motion.div variants={itemVariants} className="pt-4 space-y-4">
+              <motion.div variants={itemVariants} className="pt-1.5 space-y-3.5">
                 <button
                   type="submit"
                   disabled={loading || !selectedType || password !== confirmPassword}
-                  className="w-full py-4.5 bg-pure-aqua text-white rounded-[24px] font-semibold text-sm uppercase tracking-widest shadow-xl shadow-pure-aqua/20 flex items-center justify-center gap-2 active:scale-[0.98] transition-all disabled:opacity-50"
+                  className="w-full py-4 bg-pure-aqua text-white rounded-[24px] font-semibold text-sm uppercase tracking-widest shadow-xl shadow-pure-aqua/20 flex items-center justify-center gap-2 active:scale-[0.98] transition-all disabled:opacity-50"
                 >
                   {loading ? (
                     <CircularProgress size={20} color="inherit" />
@@ -424,7 +497,7 @@ export default function SignupPage() {
                   )}
                 </button>
 
-                <p className="text-center text-sm font-medium text-slate-500">
+                <p className="text-center text-xs font-medium text-slate-500">
                   Already have an account?{" "}
                   <Link to="/login" className="text-pure-aqua font-semibold hover:underline decoration-2 underline-offset-4">
                     Sign In
@@ -434,7 +507,6 @@ export default function SignupPage() {
             </form>
           </motion.div>
         </div>
-      </div>
-    </div>
+      </div>    </div>
   );
 }
