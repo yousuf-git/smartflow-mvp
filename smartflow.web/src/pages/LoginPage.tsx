@@ -14,6 +14,26 @@ import { Droplets, Eye, EyeOff, Mail, Lock, ArrowRight } from "lucide-react";
 import { useAuth } from "../contexts/AuthContext";
 import { Link, useNavigate } from "react-router-dom";
 
+const fieldSx = {
+  "& .MuiOutlinedInput-root": {
+    backgroundColor: "#F8FAFC",
+    borderRadius: "16px",
+    "& fieldset": { borderColor: "transparent" },
+    "&:hover fieldset": { borderColor: "#E2E8F0" },
+    "&.Mui-focused fieldset": { borderColor: "#00A3FF" },
+  },
+  "& .MuiInputLabel-root": {
+    fontWeight: 600,
+    color: "#64748B",
+    "&.Mui-focused": { color: "#00A3FF" }
+  },
+  "& .MuiOutlinedInput-input": {
+    py: 1.8,
+    fontWeight: 600,
+    fontSize: '0.9rem',
+  },
+};
+
 export default function LoginPage() {
   const { login, user, isLoading: authLoading } = useAuth();
   const navigate = useNavigate();
@@ -118,15 +138,14 @@ export default function LoginPage() {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 autoComplete="email"
-                variant="outlined"
+                sx={fieldSx}
                 slotProps={{
                   input: {
                     startAdornment: (
                       <InputAdornment position="start">
-                        <Mail className="w-4 h-4 text-pure-aqua" />
+                        <Mail className="w-4 h-4 text-slate-400" />
                       </InputAdornment>
                     ),
-                    sx: { borderRadius: '16px', bgcolor: '#F8FAFC', fontWeight: 500 }
                   },
                 }}
               />
@@ -141,11 +160,12 @@ export default function LoginPage() {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 autoComplete="current-password"
+                sx={fieldSx}
                 slotProps={{
                   input: {
                     startAdornment: (
                       <InputAdornment position="start">
-                        <Lock className="w-4 h-4 text-pure-aqua" />
+                        <Lock className="w-4 h-4 text-slate-400" />
                       </InputAdornment>
                     ),
                     endAdornment: (
@@ -163,7 +183,6 @@ export default function LoginPage() {
                         </IconButton>
                       </InputAdornment>
                     ),
-                    sx: { borderRadius: '16px', bgcolor: '#F8FAFC', fontWeight: 500 }
                   },
                 }}
               />

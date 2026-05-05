@@ -6,6 +6,7 @@ import {
   DialogTitle,
   IconButton,
   TextField,
+  InputAdornment,
 } from "@mui/material";
 import {
   Droplets,
@@ -27,6 +28,26 @@ import {
   type CustomerCaneDetail,
 } from "../../lib/customerApi";
 import { type Period, periodDates, formatTimestamp } from "../../lib/time";
+
+const fieldSx = {
+  "& .MuiOutlinedInput-root": {
+    backgroundColor: "#F8FAFC",
+    borderRadius: "16px",
+    "& fieldset": { borderColor: "transparent" },
+    "&:hover fieldset": { borderColor: "#E2E8F0" },
+    "&.Mui-focused fieldset": { borderColor: "#00A3FF" },
+  },
+  "& .MuiInputLabel-root": {
+    fontWeight: 600,
+    color: "#64748B",
+    "&.Mui-focused": { color: "#00A3FF" }
+  },
+  "& .MuiOutlinedInput-input": {
+    py: 1.8,
+    fontWeight: 600,
+    fontSize: '0.9rem',
+  },
+};
 
 const CANE_STATUS_MAP: Record<string, { label: string; color: string; bg: string }> = {
   completed:         { label: "Completed",   color: "#059669", bg: "#ecfdf5" },
@@ -333,14 +354,24 @@ export default function CustomerTransactions() {
           </div>
         </DialogTitle>
         <DialogContent sx={{ p: 3, pt: 1 }}>
-          <div className="space-y-4 mt-4">
+          <div className="space-y-5 mt-4">
             <TextField
               label="Starting From"
               type="date"
               fullWidth
               value={dateFrom}
               onChange={(e) => setDateFrom(e.target.value)}
-              slotProps={{ inputLabel: { shrink: true }, input: { sx: { borderRadius: '16px' } } }}
+              sx={fieldSx}
+              slotProps={{
+                inputLabel: { shrink: true },
+                input: {
+                  startAdornment: (
+                    <InputAdornment position="start">
+                      <Calendar className="w-4 h-4 text-slate-400" />
+                    </InputAdornment>
+                  ),
+                }
+              }}
             />
             <TextField
               label="Ending At"
@@ -348,19 +379,29 @@ export default function CustomerTransactions() {
               fullWidth
               value={dateTo}
               onChange={(e) => setDateTo(e.target.value)}
-              slotProps={{ inputLabel: { shrink: true }, input: { sx: { borderRadius: '16px' } } }}
+              sx={fieldSx}
+              slotProps={{
+                inputLabel: { shrink: true },
+                input: {
+                  startAdornment: (
+                    <InputAdornment position="start">
+                      <Calendar className="w-4 h-4 text-slate-400" />
+                    </InputAdornment>
+                  ),
+                }
+              }}
             />
           </div>
           <div className="grid grid-cols-2 gap-3 mt-8">
              <button
                 onClick={() => { setDateFrom(""); setDateTo(""); selectPeriod("today"); setFilterOpen(false); }}
-                className="py-3.5 rounded-2xl bg-slate-100 text-slate-600 text-sm font-semibold active:scale-[0.98] transition-all"
+                className="py-4 rounded-[20px] bg-slate-100 text-slate-500 text-sm font-bold active:scale-[0.98] transition-all"
              >
                Reset
              </button>
              <button
                 onClick={applyCustom}
-                className="py-3.5 rounded-2xl bg-pure-aqua text-white text-sm font-semibold shadow-lg shadow-pure-aqua/20 active:scale-[0.98] transition-all"
+                className="py-4 rounded-[20px] bg-pure-aqua text-white text-sm font-bold shadow-lg shadow-pure-aqua/20 active:scale-[0.98] transition-all"
              >
                Apply Filter
              </button>

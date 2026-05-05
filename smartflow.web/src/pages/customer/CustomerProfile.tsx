@@ -39,6 +39,26 @@ async function compressLosslessPng(file: File): Promise<Blob> {
   });
 }
 
+const fieldSx = {
+  "& .MuiOutlinedInput-root": {
+    backgroundColor: "#F8FAFC",
+    borderRadius: "16px",
+    "& fieldset": { borderColor: "transparent" },
+    "&:hover fieldset": { borderColor: "#E2E8F0" },
+    "&.Mui-focused fieldset": { borderColor: "#00A3FF" },
+  },
+  "& .MuiInputLabel-root": {
+    fontWeight: 600,
+    color: "#64748B",
+    "&.Mui-focused": { color: "#00A3FF" }
+  },
+  "& .MuiOutlinedInput-input": {
+    py: 1.5,
+    fontWeight: 600,
+    fontSize: '0.9rem',
+  },
+};
+
 export default function CustomerProfile() {
   const { user, logout, setUser } = useAuth();
   const [dash, setDash] = useState<CustomerDashboard | null>(null);
@@ -181,14 +201,14 @@ export default function CustomerProfile() {
                     size="small"
                     value={firstName}
                     onChange={(e) => setFirstName(e.target.value)}
-                    slotProps={{ input: { sx: { borderRadius: '12px', fontSize: '0.9rem' } } }}
+                    sx={fieldSx}
                   />
                   <TextField
                     placeholder="Last"
                     size="small"
                     value={lastName}
                     onChange={(e) => setLastName(e.target.value)}
-                    slotProps={{ input: { sx: { borderRadius: '12px', fontSize: '0.9rem' } } }}
+                    sx={fieldSx}
                   />
                 </div>
                 <div className="flex justify-center gap-2">
